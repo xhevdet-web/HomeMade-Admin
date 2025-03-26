@@ -1,0 +1,65 @@
+.multi-select-container {
+  width: 100%;
+  position: relative;
+}
+
+.multi-select-input-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.multi-select-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 5px;
+}
+
+.multi-select-dropdown-toggle {
+  display: none;
+}
+
+.multi-select-options {
+  margin-top: -15px;
+  width: 100%;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.multi-select-option {
+  padding: 10px;
+  cursor: pointer;
+}
+
+.multi-select-badge {
+  display: inline-flex;
+  align-items: center;
+  margin: 2px;
+  padding-right: 5px;
+  font-size: 14px;
+  font-weight: 400;
+  background-color: #e7eaee;
+  color: black;
+}
+
+.multi-select-remove-btn {
+  margin-left: 5px;
+  font-size: 18px;
+  font-weight: 600;
+  padding: 0;
+  border: none;
+  background: none;
+  color: rgba(37, 43, 54, 0.681);
+  cursor: pointer;
+  &:hover {
+    color: black;
+  }
+}
