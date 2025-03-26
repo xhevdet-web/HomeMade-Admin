@@ -1,0 +1,21 @@
+.qr-code-modal {
+  // border: 1px solid red !important;
+
+  .modal-dialog {
+    .modal-content {
+      .modal-body {
+        img {
+          width: 80%;
+          height: 80%;
+          display: flex;
+          margin: 0 auto;
+
+          @media (max-width: 576px) {
+            width: 70%;
+            height: 70%;
+          }
+        }
+      }
+    }
+  }
+}

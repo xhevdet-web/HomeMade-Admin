@@ -1,0 +1,30 @@
+.attendance-body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.blue-background {
+  margin-top: auto;
+  height: 40vh;
+  background-color: #5856d6;
+  filter: grayscale(30%);
+  position: absolute;
+  width: 100%;
+  bottom: 0;
+  p {
+    position: absolute;
+    z-index: 1;
+    bottom: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+}
+
+.card-qrCode {
+  position: absolute;
+  z-index: 1;
+  top: 60%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
