@@ -13,8 +13,9 @@ import {
 
 import { AppSidebarNav } from './AppSidebarNav'
 
-import avatar8 from './../assets/images/avatars/cacttus.png'
 import avatar9 from './../assets/images/avatars/cacttus.png'
+import avatar8 from './../assets/images/avatars/wh_cac.png'
+
 
 // sidebar nav config
 // import navigation from '../_nav'
