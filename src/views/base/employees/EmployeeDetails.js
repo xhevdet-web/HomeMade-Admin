@@ -14,6 +14,7 @@ import {
 } from '@coreui/react'
 import { FaFilePdf } from 'react-icons/fa'
 import useAxios from '../../../utils/useAxios'
+import formatPhoneNumber from '../../../utils/formatNumber'
 
 const EmployeeDetails = () => {
     const { id } = useParams()
@@ -80,34 +81,81 @@ const EmployeeDetails = () => {
                 <CCardBody className="fs-5 mx-3">
                     {/* Personal Info */}
                     <section className="mb-5">
-                        <h5 className="mb-3">📌 Personal Information</h5>
-                        <CRow className="gy-3">
-                            <CCol md={6}><strong>Name:</strong> {first_name} {last_name}</CCol>
-                            <CCol md={6}><strong>Email:</strong> {email}</CCol>
-                            <CCol md={6}><strong>Phone:</strong> {phone_number}</CCol>
-                            <CCol md={6}><strong>Birthdate:</strong> {birthdate}</CCol>
-                            <CCol md={6}><strong>Joining Date:</strong> {joining_date}</CCol>
-                            <CCol md={6}><strong>Years Experience:</strong> {years_exp}</CCol>
-                        </CRow>
+                        <h5 className="mb-3 fs-4 fw-semibold border-start ps-2 border-primary border-4">
+                            📌 Personal Information
+                        </h5>                        <div className="mb-4">
+                            <CRow className="align-items-center py-2 border-bottom">
+                                <CCol md={4}><strong>Name:</strong></CCol>
+                                <CCol md={8}>{first_name} {last_name}</CCol>
+                            </CRow>
+                            <CRow className="align-items-center py-2 border-bottom">
+                                <CCol md={4}><strong>Email:</strong></CCol>
+                                <CCol md={8}>{email}</CCol>
+                            </CRow>
+                            <CRow className="align-items-center py-2 border-bottom">
+                                <CCol md={4}><strong>Phone:</strong></CCol>
+                                <CCol md={8}>{formatPhoneNumber(phone_number)}</CCol>
+                            </CRow>
+                            <CRow className="align-items-center py-2 border-bottom">
+                                <CCol md={4}><strong>Birthdate:</strong></CCol>
+                                <CCol md={8}>
+                                    {birthdate
+                                        ? new Intl.DateTimeFormat('en-GB', {
+                                            day: '2-digit',
+                                            month: 'long',
+                                            year: 'numeric',
+                                        }).format(new Date(birthdate))
+                                        : ''}
+                                </CCol>
+                            </CRow>
+
+                            <CRow className="align-items-center py-2 border-bottom">
+                                <CCol md={4}><strong>Joining Date:</strong></CCol>
+                                <CCol md={8}>
+                                    {joining_date
+                                        ? new Intl.DateTimeFormat('en-GB', {
+                                            day: '2-digit',
+                                            month: 'long',
+                                            year: 'numeric',
+                                        }).format(new Date(joining_date))
+                                        : ''}
+                                </CCol>
+                            </CRow>
+                            <CRow className="align-items-center py-2">
+                                <CCol md={4}><strong>Years of Experience:</strong></CCol>
+                                <CCol md={8}>{years_exp}</CCol>
+                            </CRow>
+                        </div>
+
                     </section>
                     <hr />
 
                     {/* Work Info */}
                     <section className="mb-5">
-                        <h5 className="mb-3">💼 Work Information</h5>
-                        <CRow className="gy-3">
-                            <CCol md={6}><strong>Employee Type:</strong> {employee_type?.name}</CCol>
-                            <CCol md={6}><strong>Specialization:</strong> {specialization?.name}</CCol>
-                        </CRow>
+                        <h5 className="mb-3 fs-4 fw-semibold border-start ps-2 border-primary border-4">
+                            💼 Work Information
+                        </h5>                        <div className="mb-4">
+                            <CRow className="align-items-center py-2 border-bottom">
+                                <CCol md={4}><strong>Employee Type:</strong></CCol>
+                                <CCol md={8}>{employee_type?.name || '-'}</CCol>
+                            </CRow>
+                            <CRow className="align-items-center py-2">
+                                <CCol md={4}><strong>Specialization:</strong></CCol>
+                                <CCol md={8}>{specialization?.name || '-'}</CCol>
+                            </CRow>
+                        </div>
+
                     </section>
                     <hr />
 
                     {/* Technologies */}
                     <section className="mb-5">
-                        <h5 className="mb-3">🛠 Technologies and Tools</h5>
+                        <h5 className="mb-3 fs-4 fw-semibold border-start ps-2 border-primary border-4">
+                            🛠 Technologies and Tools
+                        </h5>
                         <div className="d-flex flex-wrap gap-2">
                             {technologies?.map((tech) => (
-                                <div key={tech.id} className="px-3 py-2 text-white">
+                                <div key={tech.id} className="px-3 py-2">
                                     {tech.name}
                                 </div>
                             ))}
@@ -117,12 +165,14 @@ const EmployeeDetails = () => {
 
                     {/* Documents */}
                     <section className="mb-5">
-                        <h5 className="mb-3">📄 Documents</h5>
+                        <h5 className="mb-3 fs-4 fw-semibold border-start ps-2 border-primary border-4">
+                            📄 Documents
+                        </h5>
                         <ul className="ps-3">
                             {documents?.map((doc) => (
                                 <li key={doc.id} className="mb-1">
                                     <a
-                                        href={`/${doc.url.replaceAll('\\', '/')}`}
+                                        href={`${import.meta.env.VITE_IMAGES_API}${doc.url}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="text-decoration-none"
@@ -138,19 +188,22 @@ const EmployeeDetails = () => {
 
                     {/* Price Range */}
                     <section>
-                        <h5 className="mb-3">💲 Price Range</h5>
-                        <CCard className="border-0">
-                            <CCardBody className="fs-6">
-                                <CRow className="gy-2">
-                                    <CCol md={6}>
-                                        <strong>From - To:</strong> {price_range?.price_from} - {price_range?.price_to} {currencyCode}
-                                    </CCol>
-                                    <CCol md={6}>
-                                        <strong>Rate Type:</strong> {price_range?.rate_type?.name}
-                                    </CCol>
-                                </CRow>
-                            </CCardBody>
-                        </CCard>
+                        <h5 className="mb-3 fs-4 fw-semibold border-start ps-2 border-primary border-4">
+                            💲 Price Range
+                        </h5>
+                        <div className="mb-4">
+                            <CRow className="align-items-center py-2 border-bottom">
+                                <CCol md={4}><strong>Price Range:</strong></CCol>
+                                <CCol md={8}>
+                                    {price_range?.price_from} - {price_range?.price_to} ({currencyCode})
+                                </CCol>
+                            </CRow>
+                            <CRow className="align-items-center py-2">
+                                <CCol md={4}><strong>Rate Type:</strong></CCol>
+                                <CCol md={8}>{price_range?.rate_type?.name}</CCol>
+                            </CRow>
+                        </div>
+
                     </section>
                 </CCardBody>
             </CCard>

@@ -59,35 +59,43 @@ const EmployeesModal = ({ handleModalClose, type, defaultData, callback }) => {
           axiosRequest('/lists/4', 'get'),
           axiosRequest('/lists/5', 'get'),
         ])
+
         setSpecializations(specRes.data)
         setEmployeeTypes(typeRes.data)
         setTechnologies(techRes.data)
         setRateTypes(rateRes.data)
         setCurrencies(currencyRes.data)
 
-        if (type === 'put' && defaultData?.technologies?.length) {
-          const selectedTechs = defaultData.technologies.map(tech => ({
-            value: tech.id || tech.technology_id,
-            label: tech.name || tech.list?.name,
-          }))
-
+        if (defaultData) {
           setData(prev => ({
             ...prev,
-            technologies: selectedTechs,
+            employee_type_id: defaultData.employee_type?.id || '',
+            specialization_id: defaultData.specialization?.id || '',
+            price_range: {
+              ...prev.price_range,
+              rate_type_id: defaultData.price_range?.rate_type?.id || '',
+              currency_type_id: defaultData.price_range?.currency_type?.id || '',
+            },
+            technologies: defaultData?.technologies?.map(tech => ({
+              value: tech.id || tech.technology_id,
+              label: tech.name || tech.list?.name,
+            })) || [],
           }))
         }
+
       } catch (err) {
         console.error('❌ Error loading options:', err)
       } finally {
         setLoading(false)
       }
     }
+
     fetchOptions()
   }, [])
 
   const handleChange = (e) => {
     const { name, value, type: inputType, checked } = e.target;
-    // const parsedValue = value === '' ? null : value;
+    const parsedValue = value === '' ? null : value;
     setData(prev => ({ ...prev, [name]: inputType === 'checkbox' ? checked : parsedValue }));
   };
 
@@ -203,7 +211,6 @@ const EmployeesModal = ({ handleModalClose, type, defaultData, callback }) => {
                   <CFormSelect name="specialization_id" value={data?.specialization_id} onChange={handleChange} floatingLabel="Specialization" required>
                     <option value="" disabled hidden>Select Specialization</option>
                     {specializations.map(item => {
-                      console.log('[🧩 SPECIALIZATION OPTION]', item)
                       return (
                         <option key={item?.id} value={item?.id}>
                           {item?.name}

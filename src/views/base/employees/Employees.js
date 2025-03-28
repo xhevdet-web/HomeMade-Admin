@@ -10,9 +10,11 @@ import {
     CTableBody,
     CTableDataCell,
     CButton,
+    CTooltip
 } from '@coreui/react'
 import useAxios from '../../../utils/useAxios'
 import { useModal } from '../../../_helpers/HandleModals'
+import formatPhoneNumber from '../../../utils/formatNumber'
 
 const Employees = () => {
     const navigate = useNavigate()
@@ -83,7 +85,7 @@ const Employees = () => {
                             <CTableHeaderCell className="bg-body-tertiary">Name</CTableHeaderCell>
                             <CTableHeaderCell className="bg-body-tertiary">Email</CTableHeaderCell>
                             <CTableHeaderCell className="bg-body-tertiary">Phone</CTableHeaderCell>
-                            <CTableHeaderCell className="bg-body-tertiary">Years Exp</CTableHeaderCell>
+                            <CTableHeaderCell className="bg-body-tertiary">Years Experience</CTableHeaderCell>
                             <CTableHeaderCell className="bg-body-tertiary">Joining Date</CTableHeaderCell>
                             <CTableHeaderCell className="bg-body-tertiary text-center">Actions</CTableHeaderCell>
                         </CTableRow>
@@ -91,12 +93,20 @@ const Employees = () => {
                     <CTableBody>
                         {employees.map((emp, index) => (
                             <CTableRow key={index}>
-                                <CTableDataCell>{`${emp.first_name} ${emp.last_name}`}</CTableDataCell>
-                                <CTableDataCell>{emp.email}</CTableDataCell>
-                                <CTableDataCell>{emp.phone_number}</CTableDataCell>
-                                <CTableDataCell>{emp.years_exp}</CTableDataCell>
-                                <CTableDataCell>{emp.joining_date}</CTableDataCell>
-                                <CTableDataCell className="text-center">
+                                <CTableDataCell>{`${emp?.first_name} ${emp?.last_name}`}</CTableDataCell>
+                                <CTableDataCell>{emp?.email}</CTableDataCell>
+                                <CTableDataCell>{formatPhoneNumber(emp?.phone_number)}</CTableDataCell>
+                                <CTableDataCell>{emp?.years_exp}</CTableDataCell>
+                                <CTableDataCell>
+                                    {emp.joining_date
+                                        ? new Intl.DateTimeFormat('en-GB', {
+                                            day: '2-digit',
+                                            month: 'long',
+                                            year: 'numeric',
+                                        }).format(new Date(emp.joining_date))
+                                        : ''}
+                                </CTableDataCell>
+                                <CTableDataCell className="text-center d-flex">
                                     <CButton
                                         // disabled={true}
                                         size="sm"
@@ -106,14 +116,19 @@ const Employees = () => {
                                     >
                                         Modify
                                     </CButton>
-                                    <CButton
-                                        size="sm"
-                                        color="danger"
-                                        className="text-white text-bold px-3 me-2"
-                                        onClick={() => handleDelete(emp)}
-                                    >
-                                        Delete
-                                    </CButton>
+                                    <CTooltip content="For the moment you cannot delete an item" placement="top">
+                                        <div>
+                                            <CButton
+                                                disabled
+                                                size="sm"
+                                                color="danger"
+                                                className="text-white text-bold px-3 me-2"
+                                            >
+                                                Delete
+                                            </CButton>
+                                        </div>
+                                    </CTooltip>
+
                                     <CButton
                                         size="sm"
                                         color="primary"

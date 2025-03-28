@@ -118,7 +118,7 @@ const Login = () => {
                           timeout={2000}
                           type="submit"
                           // color="primary"
-                          className="px-4 bg-primary"
+                          className="px-4 bg-primary text-white"
                           disabled={isLoading}
                         >
                           Login
