@@ -1,19 +1,25 @@
 import React from "react";
-import { useAuthSelector } from "../../redux/selectors/authSelectors";
-
-import AdminDashboard from "./AdminDashboard";
-import SuperAdminDashboard from "./SuperAdminDashboard";
+import { CContainer, CRow, CCol } from "@coreui/react";
+import logo from "../../assets/images/avatars/cacttus.png";
 
 const Dashboard = () => {
-  const { userData } = useAuthSelector();
   return (
-    <div>
-      {userData?.role_id === "7945d759-2ed7-4beb-bc13-fcebd2e12b70" ? (
-        <SuperAdminDashboard />
-      ) : userData?.role_id === "ea35b1d4-8675-4230-9520-f44e3cf12cf4" ? (
-        <AdminDashboard />
-      ) : null}
-    </div>
+    <CContainer className="text-center py-5">
+      <CRow className="justify-content-center">
+        <CCol md={6}>
+          <img
+            src={logo}
+            alt="Dashboard Logo"
+            className="img-fluid mb-4"
+            style={{ maxHeight: "150px" }}
+          />
+          <h2 className="fw-bold mb-2">Welcome to the Team Management Platform</h2>
+          <p className="text-muted fs-5">
+            This platform is built to manage employee information and CVs — all in one organized and accessible place.
+          </p>
+        </CCol>
+      </CRow>
+    </CContainer>
   );
 };
 

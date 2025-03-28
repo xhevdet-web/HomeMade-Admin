@@ -14,7 +14,7 @@ const componentMap = {
   ListType: React.lazy(() => import('../views/base/lists/ListType')),
   ListItems: React.lazy(() => import('../views/base/lists/ListItems')),
   // Genders: React.lazy(() => import('../views/base/genders/Genders')),
-  // Dashboard: React.lazy(() => import('../views/dashboard/Dashboard')),
+  Dashboard: React.lazy(() => import('../views/dashboard/Dashboard')),
   RolePrivilege: React.lazy(() => import('../views/base/roles/RolePrivilege')),
 
   Login: React.lazy(() => import('../views/pages/login/Login')), // Ensure Page404 is included in your lazy imports

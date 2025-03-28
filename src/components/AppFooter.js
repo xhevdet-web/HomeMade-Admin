@@ -5,8 +5,8 @@ const AppFooter = () => {
   return (
     <CFooter className="px-4">
       <div>
-        <a href="https://cacttus.com/harrisia" target="_blank" rel="noopener noreferrer">
-          Harrisia
+        <a href="https://cacttus.com/" target="_blank" rel="noopener noreferrer">
+          Cacttus
         </a>
         <span className="ms-1">&copy; 2024</span>
       </div>
