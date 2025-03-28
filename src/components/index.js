@@ -7,6 +7,7 @@ import AppSidebar from './AppSidebar'
 import Preloader from './Preloader'
 import DocsExample from './DocsExample'
 import CustomButton from './CustomButton'
+import MultiSelect from './MultiSelect'
 
 export {
   AppBreadcrumb,
@@ -18,4 +19,5 @@ export {
   AppSidebar,
   Preloader,
   CustomButton,
+  MultiSelect,
 }

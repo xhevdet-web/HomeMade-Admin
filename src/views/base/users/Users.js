@@ -16,7 +16,7 @@ import { cilPeople } from '@coreui/icons'
 
 import { useModal } from '../../../_helpers/HandleModals'
 import useAxios from '../../../utils/useAxios'
-import { checkUserPermissions } from '../../../_helpers/UserInRole'
+import  checkUserPermissions  from '../../../_helpers/UserInRole'
 import { useSidebarSelector } from '../../../redux/selectors/sidebarSelector'
 import { useLocation } from 'react-router-dom'
 import { useAuthSelector } from '../../../redux/selectors/authSelectors'

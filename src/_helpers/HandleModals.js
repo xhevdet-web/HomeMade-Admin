@@ -8,7 +8,9 @@ import {
   AddUser,
   AddActionFunction,
   ConfirmationModal,
-
+  ListTypeModal,
+  ListItemsModal,
+  EmployeesModal,
 } from '../views/modals'
 
 
@@ -24,8 +26,9 @@ const modalComponents = {
   AddNav: AddActionFunction,
   RoleCreationRights: RoleCreationRights,
   ConfirmationModal: ConfirmationModal,
-
-
+  ListTypeModal,
+  ListItemsModal,
+  EmployeesModal,
 }
 
 const HandleModals = ({ children }) => {
@@ -42,7 +45,7 @@ const HandleModals = ({ children }) => {
         console.error('Invalid modal type or missing data')
         return
       }
-      console.log('message', message)
+      // console.log('message', message)
       setModalContent(
         <ModalComponent
           defaultData={data}

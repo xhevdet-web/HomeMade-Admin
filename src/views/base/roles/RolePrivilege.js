@@ -38,7 +38,7 @@ const RolePrivilege = () => {
   const { axiosRequest } = useAxios()
 
   const fetchActions = async () => {
-    const { data } = await axiosRequest('/nav/all', 'get')
+    const { data } = await axiosRequest(`/nav/all?role_id=${item.id}`, 'get')
     const roleCreationRights = await axiosRequest(`/role-delegation-rights/${item.id}/all`, 'get')
     setDelegationRights(roleCreationRights.data ?? [])
     setActions(data)
@@ -48,8 +48,8 @@ const RolePrivilege = () => {
     fetchActions()
   }, [])
 
-  const getRoleRightsForNav = (navId) => {
-    return item.roleRights?.find((roleRight) => roleRight.nav_id === navId) || {}
+  const getRoleRightsForNav = (navItem) => {
+    return navItem.nav_rights?.[0] || {}
   }
 
   const handleEditPrivilege = (navId) => {
@@ -57,7 +57,8 @@ const RolePrivilege = () => {
       if (prev === navId) {
         return null
       } else {
-        const roleRight = getRoleRightsForNav(navId)
+        const navItem = actions.find((nav) => nav.id === navId)
+        const roleRight = getRoleRightsForNav(navItem)
         setTempRoleRights({ ...roleRight })
         return navId
       }
@@ -90,14 +91,17 @@ const RolePrivilege = () => {
       const response = await axiosRequest('/role-rights/update', 'put', requestBody)
 
       if (response.status === 'Success') {
-        const updatedRoleRights = item.roleRights.map((roleRight) => {
-          if (roleRight.nav_id === elementId) {
-            return { ...roleRight, ...response.data }
+        const updatedActions = actions.map((nav) => {
+          if (nav.id === elementId) {
+            return {
+              ...nav,
+              nav_rights: [{ ...nav.nav_rights?.[0], ...response.data }],
+            }
           }
-          return roleRight
+          return nav
         })
 
-        item.roleRights = updatedRoleRights
+        setActions(updatedActions)
         setEditingId(null)
         setTempRoleRights({})
       }
@@ -134,14 +138,14 @@ const RolePrivilege = () => {
           </CTableRow>
         </CTableHead>
         <CTableBody>
-          {actions.map((action, index) => {
-            const roleRight = getRoleRightsForNav(action.id)
+          {actions?.map((action, index) => {
+            const roleRight = getRoleRightsForNav(action)
             const isEditing = editingId === action.id
             const currentRights = isEditing ? tempRoleRights : roleRight
             return (
               <CTableRow key={index}>
                 <CTableDataCell>
-                  <div>{action.to.includes('/admin/') ? <b>ADMIN -&gt; {action.title}</b> : <i>Client -&gt; {action.title}</i> }</div>
+                  <div>{action.to.includes('/admin/') ? <b>ADMIN -&gt; {action.title}</b> : <i>Client -&gt; {action.title}</i>}</div>
                 </CTableDataCell>
                 <CTableDataCell className="text-center col-2">
                   <CFormCheck
@@ -202,78 +206,6 @@ const RolePrivilege = () => {
               </CTableRow>
             )
           })}
-        </CTableBody>
-      </CTable>
-      <hr className="mt-3" />
-      <CRow className="my-3">
-        <CCol sm={7}>
-          <h4 id="traffic" className="card-title mb-0">
-            Role Delegation Rights
-          </h4>
-        </CCol>
-        <CCol sm={5} className="text-end">
-          {checkUserPermissions(navItem, 'create', roleId) && (
-            <CustomButton
-              actionType="create"
-              onClick={() => showModal('RoleDelegationRights', [item.id, roles], 'post')}
-            >
-              ALLOW NEW DELEGATION
-            </CustomButton>
-          )}
-        </CCol>
-      </CRow>
-
-      <CTable align="middle" className="mb-0 border" hover responsive>
-        <CTableHead className="text-nowrap">
-          <CTableRow>
-            <CTableHeaderCell className="bg-body-tertiary">Role Name</CTableHeaderCell>
-            <CTableHeaderCell className="bg-body-tertiary "></CTableHeaderCell>
-            <CTableHeaderCell className="bg-body-tertiary ">Can create</CTableHeaderCell>
-            <CTableHeaderCell className="bg-body-tertiary text-center ">Actions</CTableHeaderCell>
-          </CTableRow>
-        </CTableHead>
-        <CTableBody>
-          {delegationRights.length === 0 ? (
-            <CTableRow>
-              <CTableDataCell className="text-center">
-                No role creation rights found.
-              </CTableDataCell>
-            </CTableRow>
-          ) : (
-            delegationRights.map((action, index) => {
-              return (
-                <CTableRow key={index}>
-                  <CTableDataCell className="col-3">
-                    <CFormInput
-                      disabled
-                      placeholder={roles?.find((role) => role.id === action.role_id)?.name}
-                    ></CFormInput>
-                  </CTableDataCell>
-                  <CTableDataCell className="col-3">
-                    <div className="text-body-secondary text-center text-truncate medium">
-                      Mund të delegoj raporte tek roli -{'>'}
-                    </div>
-                  </CTableDataCell>
-                  <CTableDataCell className="col-3">
-                    <CFormInput
-                      disabled
-                      placeholder={
-                        roles?.find((role) => role.id === action.can_create_role_id)?.name
-                      }
-                    ></CFormInput>
-                  </CTableDataCell>
-                  <CTableDataCell className="col-3 text-center">
-                    <CustomButton
-                      actionType="delete"
-                      onClick={() => handleDeleteCreationRight(action.id)}
-                    >
-                      Delete
-                    </CustomButton>
-                  </CTableDataCell>
-                </CTableRow>
-              )
-            })
-          )}
         </CTableBody>
       </CTable>
     </>
