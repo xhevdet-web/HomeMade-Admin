@@ -103,54 +103,45 @@ const Login = () => {
                         autoComplete="current-password"
                       />
                     </CInputGroup>
-                    <CFormCheck
+                    {/* <CFormCheck
                       id="RememberMe"
                       name="rememberMe"
                       checked={data.rememberMe}
                       onChange={handleInputChange}
                       className="mb-2"
                       label="Remember me!"
-                    />
+                    /> */}
 
-                    <CRow>
+                    <CRow className='mt-3'>
                       <CCol xs={6}>
                         <CButton
                           timeout={2000}
                           type="submit"
                           // color="primary"
-                          className="bg-costum px-4"
+                          className="px-4 bg-primary"
                           disabled={isLoading}
                         >
                           Login
                         </CButton>
                       </CCol>
                       <CCol xs={6} className="text-right">
-                        <CButton color="link" className="px-0">
+                        {/* <CButton color="link" className="px-0">
                           Forgot password?
-                        </CButton>
+                        </CButton> */}
                       </CCol>
                     </CRow>
                   </CForm>
                 </CCardBody>
               </CCard>
               <CCard className="text-black bg-white py-5" >
-                <CCardBody className="text-center">
+                <CCardBody className="text-center d-flex align-items-center">
                   <div>
                     <CImage className="col-8 " src={SIMSLogo} alt="SIMS" />
                     {/* <h2>SIMS</h2> */}
                     <p>
-                      Mirë se erdhët në platformën e menaxhimit të STAFIT të{' '}
-                      <span className="large text-body-primary text-nowrap">
-                        Cacttus-IT!
-                      </span>
+                      Mirë se erdhët në platformën e menaxhimit të STAFIT
                     </p>
-                    <hr />
-                    <CButton
-                      onClick={() => showModal('TermsAndConditions', 'sms')}
-                      className="costum-button px-2"
-                    >
-                      Kushtet dhe politikat e privatësisë!
-                    </CButton>
+                    {/* <hr /> */}
                   </div>
                 </CCardBody>
               </CCard>

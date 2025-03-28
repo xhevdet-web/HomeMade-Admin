@@ -11,14 +11,18 @@ const componentMap = {
   Users: React.lazy(() => import('../views/base/users/Users')),
   Nav: React.lazy(() => import('../views/base/nav/Nav')),
   Roles: React.lazy(() => import('../views/base/roles/Roles')),
+  ListType: React.lazy(() => import('../views/base/lists/ListType')),
+  ListItems: React.lazy(() => import('../views/base/lists/ListItems')),
   // Genders: React.lazy(() => import('../views/base/genders/Genders')),
   // Dashboard: React.lazy(() => import('../views/dashboard/Dashboard')),
   RolePrivilege: React.lazy(() => import('../views/base/roles/RolePrivilege')),
- 
+
   Login: React.lazy(() => import('../views/pages/login/Login')), // Ensure Page404 is included in your lazy imports
 
   Page404: React.lazy(() => import('../views/pages/page404/Page404')), // Ensure Page404 is included in your lazy imports
- 
+  Employees: React.lazy(() => import('../views/base/employees/Employees')),
+  EmployeeDetails: React.lazy(() => import('../views/base/employees/EmployeeDetails'))
+
 
 }
 
