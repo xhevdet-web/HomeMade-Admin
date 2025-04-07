@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from "react";
 import {
   CCol,
   CRow,
@@ -11,29 +11,29 @@ import {
   CProgress,
   CButton,
   CNavLink,
-} from '@coreui/react'
-import { NavLink, useLocation } from 'react-router-dom'
-import { useModal } from '../../../_helpers/HandleModals'
-import useAxios from '../../../utils/useAxios'
+} from "@coreui/react";
+import { NavLink, useLocation } from "react-router-dom";
+import { useModal } from "../../../_helpers/HandleModals";
+import useAxios from "../../../utils/useAxios";
 
 const Roles = () => {
-  const { showModal } = useModal()
+  const { showModal } = useModal();
 
-  const [roles, setAllRoles] = useState([])
-  const { axiosRequest } = useAxios()
+  const [roles, setAllRoles] = useState([]);
+  const { axiosRequest } = useAxios();
 
   const getAllRoles = async () => {
-    let { data } = await axiosRequest('/user-roles/all', 'get')
-    setAllRoles(data)
-  }
+    let { data } = await axiosRequest("/user-roles/all", "get");
+    setAllRoles(data);
+  };
 
   useEffect(() => {
-    getAllRoles()
-  }, [])
+    getAllRoles();
+  }, []);
 
   const calculateUsage = (roleRights) => {
-    if (!roleRights || roleRights.length === 0) return 0
-    const totalRights = roleRights.length * 4
+    if (!roleRights || roleRights.length === 0) return 0;
+    const totalRights = roleRights.length * 4;
     const trueRights = roleRights.reduce((acc, right) => {
       return (
         acc +
@@ -41,10 +41,10 @@ const Roles = () => {
         (right.read ? 1 : 0) +
         (right.update ? 1 : 0) +
         (right.delete ? 1 : 0)
-      )
-    }, 0)
-    return (trueRights / totalRights) * 100
-  }
+      );
+    }, 0);
+    return (trueRights / totalRights) * 100;
+  };
 
   return (
     <>
@@ -59,7 +59,7 @@ const Roles = () => {
             size="sm"
             color="info"
             className="text-white text-bold px-4 "
-            onClick={() => showModal('AddRole', '', 'post')}
+            onClick={() => showModal("AddRole", "", "post")}
           >
             CREATE NEW
           </CButton>
@@ -69,8 +69,12 @@ const Roles = () => {
       <CTable align="middle" className="mb-0 border" hover responsive>
         <CTableHead className="text-nowrap">
           <CTableRow>
-            <CTableHeaderCell className="bg-body-tertiary">Name</CTableHeaderCell>
-            <CTableHeaderCell className="bg-body-tertiary">Controll Allowance</CTableHeaderCell>
+            <CTableHeaderCell className="bg-body-tertiary">
+              Name
+            </CTableHeaderCell>
+            <CTableHeaderCell className="bg-body-tertiary">
+              Controll Allowance
+            </CTableHeaderCell>
             <CTableHeaderCell className="bg-body-tertiary text-center">
               Modify Privileges
             </CTableHeaderCell>
@@ -78,10 +82,14 @@ const Roles = () => {
         </CTableHead>
         <CTableBody>
           {roles?.map((item, index) => {
-            console.log(item)
-            const usageValue = calculateUsage(item.rights)
-            const usagePeriod = `${item?.rights?.length} Navs`
-            const usageColor = usageValue > 75 ? 'success' : usageValue > 50 ? 'warning' : 'danger'
+            const usageValue = calculateUsage(item.rights);
+            const usagePeriod = `${item?.rights?.length} Navs`;
+            const usageColor =
+              usageValue > 75
+                ? "success"
+                : usageValue > 50
+                  ? "warning"
+                  : "danger";
             return (
               <CTableRow key={index}>
                 <CTableDataCell>
@@ -91,25 +99,35 @@ const Roles = () => {
                   <div className="d-flex justify-content-between text-nowrap">
                     <div className="fw-semibold">{usageValue.toFixed(2)}%</div>
                     <div className="ms-3">
-                      <small className="text-body-secondary">{usagePeriod}</small>
+                      <small className="text-body-secondary">
+                        {usagePeriod}
+                      </small>
                     </div>
                   </div>
                   <CProgress thin color={usageColor} value={usageValue} />
                 </CTableDataCell>
                 <CTableDataCell className="text-center">
-                  <CNavLink to="/admin/role-privilege" as={NavLink} state={{ item, roles }}>
-                    <CButton size="sm" color="info" className="text-white text-bold px-4">
+                  <CNavLink
+                    to="/admin/role-privilege"
+                    as={NavLink}
+                    state={{ item, roles }}
+                  >
+                    <CButton
+                      size="sm"
+                      color="info"
+                      className="text-white text-bold px-4"
+                    >
                       Modify
                     </CButton>
                   </CNavLink>
                 </CTableDataCell>
               </CTableRow>
-            )
+            );
           })}
         </CTableBody>
       </CTable>
     </>
-  )
-}
+  );
+};
 
-export default Roles
+export default Roles;

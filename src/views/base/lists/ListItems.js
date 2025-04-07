@@ -10,6 +10,7 @@ import {
   CCard,
   CCardHeader,
   CCardBody,
+  CFormCheck,
 } from "@coreui/react";
 import useAxios from "../../../utils/useAxios";
 import { useModal } from "../../../_helpers";
@@ -39,7 +40,14 @@ const ListItems = () => {
       console.error("Error fetching list type name:", error);
     }
   };
-
+  const toggleActive = async (item) => {
+    try {
+      await axiosRequest(`/lists/${item.id}/toggle`, "patch");
+      fetchLists();
+    } catch (error) {
+      console.error("Failed to update active status", error);
+    }
+  };
   useEffect(() => {
     if (listTypeId) {
       fetchLists();
@@ -80,6 +88,9 @@ const ListItems = () => {
                 <CTableHeaderCell className="bg-body-tertiary">
                   List Name
                 </CTableHeaderCell>
+                <CTableHeaderCell className="bg-body-tertiary text-center">
+                  Active
+                </CTableHeaderCell>
                 <CTableHeaderCell className="bg-body-tertiary text-end">
                   Actions
                 </CTableHeaderCell>
@@ -89,6 +100,15 @@ const ListItems = () => {
               {lists.map((list, index) => (
                 <CTableRow key={index}>
                   <CTableDataCell>{list.name}</CTableDataCell>
+                  <CTableDataCell className="text-center">
+                    <CFormCheck
+                      type="checkbox"
+                      checked={list.is_active}
+                      onChange={() => toggleActive(list)}
+                      id={`isActive-${list.id}`}
+                      title="Toggle Active Status"
+                    />
+                  </CTableDataCell>
                   <CTableDataCell className="text-end">
                     <CustomButton
                       actionType="edit"
