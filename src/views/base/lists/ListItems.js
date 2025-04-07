@@ -18,10 +18,9 @@ import CustomButton from "../../../components/CustomButton";
 const ListItems = () => {
   const { listTypeId } = useParams();
   const [lists, setLists] = useState([]);
-  const [listTypeName, setListTypeName] = useState(""); 
+  const [listTypeName, setListTypeName] = useState("");
   const { axiosRequest } = useAxios();
   const { showModal } = useModal();
-
 
   const fetchLists = async () => {
     try {
@@ -31,7 +30,6 @@ const ListItems = () => {
       console.error("Error fetching lists:", error);
     }
   };
-
 
   const fetchListTypeName = async () => {
     try {
@@ -49,21 +47,21 @@ const ListItems = () => {
     }
   }, [listTypeId]);
 
-  const handleCreate = () => {
-    showModal(
-      "ListsItemsModal",
+  const handleCreate = async () => {
+    await showModal(
+      "ListItemsModal",
       { list_type_id: listTypeId },
       "post",
       fetchLists
     );
   };
 
-  const handleEdit = (list) => {
-    showModal("ListsItemsModal", list, "put", fetchLists);
+  const handleEdit = async (list) => {
+    await showModal("ListItemsModal", list, "put", fetchLists);
   };
 
-  const handleDelete = (list) => {
-    showModal("ListsItemsModal", list, "delete", fetchLists);
+  const handleDelete = async (list) => {
+    await showModal("ListItemsModal", list, "delete", fetchLists);
   };
 
   return (
