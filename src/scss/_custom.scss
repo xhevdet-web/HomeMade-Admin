@@ -10,7 +10,7 @@
   border-color: #39f !important;
 }
 .bg-costum {
-  color: #46B496;
+  color: #46b496;
   background-color: #39f !important;
 }
 
@@ -82,11 +82,32 @@
   background-color: rgba(51, 153, 255, 0.1);
 }
 
-.btn-group-exams{
+.btn-group-exams {
   position: absolute;
   bottom: 10px;
   right: 10px;
 }
-.exam-body{
+.exam-body {
   height: 350px;
 }
+// /* Custom styles for the date input field */
+// .custom-date-input {
+//   padding: 0.5rem 1rem; /* Custom padding */
+//   border-radius: 0.375rem; /* Rounded borders */
+//   background-color: #f8f9fa; /* Light background color */
+//   border: 1px solid #ced4da; /* Light border */
+//   transition:
+//     border-color 0.3s ease,
+//     box-shadow 0.3s ease; /* Smooth transition for focus */
+// }
+
+// .custom-date-input:focus {
+//   border-color: #66afe9; /* Blue border on focus */
+//   box-shadow: 0 0 5px rgba(102, 175, 233, 0.6); /* Blue shadow on focus */
+// }
+
+// .custom-date-input::-webkit-calendar-picker-indicator {
+//   background: #66afe9; /* Custom background for the calendar icon */
+//   border-radius: 5px;
+//   padding: 5px;
+// }

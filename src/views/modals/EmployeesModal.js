@@ -313,7 +313,8 @@ const EmployeesModal = ({ handleModalClose, type, defaultData, callback }) => {
                     onChange={handleChange}
                     floatingLabel="Birthdate"
                     type="date"
-                    required
+                    required={data.years_exp === ""}
+                    className="form-control"
                   />
                 </CCol>
                 <CCol md={6}>
@@ -323,7 +324,8 @@ const EmployeesModal = ({ handleModalClose, type, defaultData, callback }) => {
                     onChange={handleChange}
                     floatingLabel="Joining Date"
                     type="date"
-                    required
+                    required={data.joining_date === ""}
+                    className="form-control"
                   />
                 </CCol>
               </CRow>

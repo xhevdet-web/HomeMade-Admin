@@ -43,13 +43,13 @@ const Employees = () => {
     showModal("EmployeesModal", employee, "put", fetchEmployees);
   };
 
-  const handleDelete = async (employee) => {
-    if (!employee?.id) return;
-
+  const handleDelete = async (employee_id) => {
     try {
-      await axiosRequest(`/employees/${employee.id}`, "delete");
+      await axiosRequest(`/employees/${employee_id}`, "delete");
+      setEmployees((prevEmployees) =>
+        prevEmployees.filter((emp) => emp.id !== employee_id)
+      );
       showToast("Employee deleted successfully.", "success");
-      fetchEmployees();
     } catch (error) {
       console.error("Error deleting employee:", error);
       showToast("Failed to delete employee.", "danger");
@@ -130,21 +130,15 @@ const Employees = () => {
                   >
                     Modify
                   </CButton>
-                  <CTooltip
-                    content="For the moment you cannot delete an item"
-                    placement="top"
+
+                  <CButton
+                    size="sm"
+                    color="danger"
+                    className="text-white text-bold px-3 me-2"
+                    onClick={() => handleDelete(emp.id)}
                   >
-                    <div>
-                      <CButton
-                        disabled
-                        size="sm"
-                        color="danger"
-                        className="text-white text-bold px-3 me-2"
-                      >
-                        Delete
-                      </CButton>
-                    </div>
-                  </CTooltip>
+                    Delete
+                  </CButton>
 
                   <CButton
                     size="sm"
