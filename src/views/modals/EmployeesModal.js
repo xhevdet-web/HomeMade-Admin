@@ -13,6 +13,7 @@ import {
   CButton,
   CRow,
   CCol,
+  CFormCheck,
 } from "@coreui/react";
 import useAxios from "../../utils/useAxios";
 import { useToast, useValidation } from "../../_helpers";
@@ -138,7 +139,7 @@ const EmployeesModal = ({ handleModalClose, type, defaultData, callback }) => {
     const parsedValue = value === "" ? null : value;
     setData((prev) => ({
       ...prev,
-      [name]: inputType === "checkbox" ? checked : parsedValue,
+      [name]: inputType === "checkbox" ? checked : parsedValue, // Handle checkbox value
     }));
   };
 
@@ -211,6 +212,7 @@ const EmployeesModal = ({ handleModalClose, type, defaultData, callback }) => {
       years_exp: data.years_exp,
       employee_type_id: data.employee_type_id,
       specialization_id: data.specialization_id,
+      is_active: data.is_active, // Ensure this is included in the payload
     };
     formData.append("employeeData", JSON.stringify(employeeData));
 
@@ -337,6 +339,15 @@ const EmployeesModal = ({ handleModalClose, type, defaultData, callback }) => {
                     onChange={handleChange}
                     floatingLabel="Years of Experience"
                     type="number"
+                  />
+                </CCol>
+                <CCol md={6}>
+                  <CFormCheck
+                    name="is_active"
+                    id="is_active"
+                    label="Is Currently working"
+                    checked={data.is_active}
+                    onChange={handleChange}
                   />
                 </CCol>
               </CRow>

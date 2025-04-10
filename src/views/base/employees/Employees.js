@@ -97,6 +97,9 @@ const Employees = () => {
               <CTableHeaderCell className="bg-body-tertiary">
                 Joining Date
               </CTableHeaderCell>
+              <CTableHeaderCell className="bg-body-tertiary">
+                Is Active
+              </CTableHeaderCell>
               <CTableHeaderCell className="bg-body-tertiary text-center">
                 Actions
               </CTableHeaderCell>
@@ -120,7 +123,14 @@ const Employees = () => {
                       }).format(new Date(emp.joining_date))
                     : ""}
                 </CTableDataCell>
-                <CTableDataCell className="text-center d-flex">
+                <CTableDataCell className="text-center">
+                  {emp.is_active ? (
+                    <p className="m-0">Working</p>
+                  ) : (
+                    <p className="m-0">Not working</p>
+                  )}
+                </CTableDataCell>
+                <CTableDataCell className="text-center">
                   <CButton
                     // disabled={true}
                     size="sm"
