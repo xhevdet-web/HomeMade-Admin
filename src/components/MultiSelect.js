@@ -1,62 +1,62 @@
-import React from 'react'
-import Select from 'react-select'
-import PropTypes from 'prop-types'
-import { useTheme } from '../redux/selectors/uiSelector' // adjust path as needed
+import React from "react";
+import Select from "react-select";
+import PropTypes from "prop-types";
+import { useTheme } from "../redux/selectors/uiSelector"; // adjust path as needed
 
 const MultiSelect = ({ label, options, value, onChange, className }) => {
-  const selectedOptions = options?.filter(opt =>
-    value?.some(v => v.id === opt.value)
-  )
+  const selectedOptions = options?.filter((opt) =>
+    value?.some((v) => v.id === opt.value)
+  );
   // console.log('selectedOptions',selectedOptions)
-  const theme = useTheme()
-  const isDark = theme === 'dark'
+  const theme = useTheme();
+  const isDark = theme === "dark";
 
   const customStyles = {
     control: (base) => ({
       ...base,
-      backgroundColor: isDark ? '#2b2b2b' : '#fff',
-      color: isDark ? '#fff' : '#000',
-      borderColor: isDark ? '#444' : '#ccc',
+      backgroundColor: isDark ? "#212631" : "#fff",
+      color: isDark ? "#fff" : "#000",
+      borderColor: isDark ? "#444" : "#ccc",
     }),
     menu: (base) => ({
       ...base,
-      backgroundColor: isDark ? '#2b2b2b' : '#fff',
-      color: isDark ? '#fff' : '#000',
+      backgroundColor: isDark ? "#212631" : "#fff",
+      color: isDark ? "#fff" : "#000",
     }),
     multiValue: (base) => ({
       ...base,
-      backgroundColor: isDark ? '#444' : '#e0e0e0',
+      backgroundColor: isDark ? "#212631" : "#e0e0e0",
     }),
     multiValueLabel: (base) => ({
       ...base,
-      color: isDark ? '#fff' : '#000',
+      color: isDark ? "#fff" : "#000",
     }),
     input: (base) => ({
       ...base,
-      color: isDark ? '#fff' : '#000',
+      color: isDark ? "#fff" : "#000",
     }),
     option: (base, { isFocused, isSelected }) => ({
       ...base,
       backgroundColor: isSelected
         ? isDark
-          ? '#555'
-          : '#007bff'
+          ? "#212631"
+          : "#007bff"
         : isFocused
           ? isDark
-            ? '#3a3a3a'
-            : '#e6f0ff'
+            ? "#212631"
+            : "#e6f0ff"
           : isDark
-            ? '#2b2b2b'
-            : '#fff',
+            ? "#212631"
+            : "#fff",
       color: isDark
         ? isSelected
-          ? '#fff'
-          : '#ddd'
+          ? "#fff"
+          : "#ddd"
         : isSelected
-          ? '#fff'
-          : '#000',
+          ? "#fff"
+          : "#000",
     }),
-  }
+  };
 
   return (
     <div className={className}>
@@ -64,14 +64,21 @@ const MultiSelect = ({ label, options, value, onChange, className }) => {
       <Select
         isMulti
         options={options}
-        value={value} // ⬅️ already passed in correct format from parent
+        value={value}
         onChange={onChange}
         classNamePrefix="react-select"
-        styles={customStyles}
+        styles={{
+          ...customStyles,
+          menuPortal: (base) => ({
+            ...base,
+            zIndex: 9999,
+          }),
+        }}
+        menuPortalTarget={document.body}
       />
     </div>
-  )
-}
+  );
+};
 
 MultiSelect.propTypes = {
   label: PropTypes.string,
@@ -79,6 +86,6 @@ MultiSelect.propTypes = {
   value: PropTypes.array.isRequired,
   onChange: PropTypes.func.isRequired,
   className: PropTypes.string,
-}
+};
 
-export default MultiSelect
+export default MultiSelect;
