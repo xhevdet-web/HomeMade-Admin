@@ -1,34 +1,49 @@
-import React, { Suspense } from 'react'
-import { Route, Routes } from 'react-router-dom'
-import { CContainer, CSpinner } from '@coreui/react'
-import HandleAlerts from '../_helpers/HandleAlerts'
-import Page404 from '../views/pages/page404/Page404'
-import { useSidebarSelector } from '../redux/selectors/sidebarSelector'
-import Preloader from './Preloader'
-
+import React, { Suspense } from "react";
+import { Route, Routes } from "react-router-dom";
+import { CContainer, CSpinner } from "@coreui/react";
+import HandleAlerts from "../_helpers/HandleAlerts";
+import Page404 from "../views/pages/page404/Page404";
+import { useSidebarSelector } from "../redux/selectors/sidebarSelector";
+import Preloader from "./Preloader";
 
 const componentMap = {
-  Users: React.lazy(() => import('../views/base/users/Users')),
-  Nav: React.lazy(() => import('../views/base/nav/Nav')),
-  Roles: React.lazy(() => import('../views/base/roles/Roles')),
-  ListType: React.lazy(() => import('../views/base/lists/ListType')),
-  ListItems: React.lazy(() => import('../views/base/lists/ListItems')),
+  Users: React.lazy(() => import("../views/base/users/Users")),
+  Nav: React.lazy(() => import("../views/base/nav/Nav")),
+  Roles: React.lazy(() => import("../views/base/roles/Roles")),
+  ListType: React.lazy(() => import("../views/base/lists/ListType")),
+  ListItems: React.lazy(() => import("../views/base/lists/ListItems")),
   // Genders: React.lazy(() => import('../views/base/genders/Genders')),
-  Dashboard: React.lazy(() => import('../views/dashboard/Dashboard')),
-  RolePrivilege: React.lazy(() => import('../views/base/roles/RolePrivilege')),
+  Dashboard: React.lazy(() => import("../views/dashboard/Dashboard")),
+  RolePrivilege: React.lazy(() => import("../views/base/roles/RolePrivilege")),
 
-  Login: React.lazy(() => import('../views/pages/login/Login')), // Ensure Page404 is included in your lazy imports
+  Login: React.lazy(() => import("../views/pages/login/Login")), // Ensure Page404 is included in your lazy imports
 
-  Page404: React.lazy(() => import('../views/pages/page404/Page404')), // Ensure Page404 is included in your lazy imports
-  Employees: React.lazy(() => import('../views/base/employees/Employees')),
-  EmployeeDetails: React.lazy(() => import('../views/base/employees/EmployeeDetails'))
-
-
-}
+  Page404: React.lazy(() => import("../views/pages/page404/Page404")), // Ensure Page404 is included in your lazy imports
+  Employees: React.lazy(() => import("../views/base/employees/Employees")),
+  EmployeeDetails: React.lazy(
+    () => import("../views/base/employees/EmployeeDetails")
+  ),
+  CertificationTypes: React.lazy(
+    () => import("../views/base/lists/CertificationTypes")
+  ),
+  DepartmentTypes: React.lazy(
+    () => import("../views/base/lists/DepartmentTypes")
+  ),
+  DiplomaTypes: React.lazy(() => import("../views/base/lists/DiplomaTypes")),
+  EmployeeTypes: React.lazy(() => import("../views/base/lists/EmployeeTypes")),
+  SpecializationTypes: React.lazy(
+    () => import("../views/base/lists/SpecializationTypes")
+  ),
+  TechnologyTypes: React.lazy(
+    () => import("../views/base/lists/TechnologiesTypes")
+  ),
+  RateTypes: React.lazy(() => import("../views/base/lists/RateTypes")),
+  CurrencyTypes: React.lazy(() => import("../views/base/lists/CurrencyTypes")),
+};
 
 const AppContent = () => {
   // const routes = MyRoutes();
-  const { sidebarData } = useSidebarSelector()
+  const { sidebarData } = useSidebarSelector();
 
   // useEffect(() => {
   //   if (userData) {
@@ -36,7 +51,7 @@ const AppContent = () => {
   //   }
   // }, [userData, showModal])
 
-  const routes = sidebarData?.filter((route) => route.name !== 'Login')
+  const routes = sidebarData?.filter((route) => route.name !== "Login");
 
   return (
     <CContainer className="px-4 app-content" fluid>
@@ -45,7 +60,7 @@ const AppContent = () => {
           {/* <ShowAlerts notifications={notifications} /> */}
           <Routes>
             {routes?.map((route, idx) => {
-              const Component = componentMap[route.name] || Page404
+              const Component = componentMap[route.name] || Page404;
               return (
                 route.name && (
                   <Route
@@ -60,7 +75,7 @@ const AppContent = () => {
                     }
                   />
                 )
-              )
+              );
             })}
             <Route path="*" name="Page 404" element={<Page404 />} />
             {/* <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -73,7 +88,7 @@ const AppContent = () => {
         </HandleAlerts>
       </Suspense>
     </CContainer>
-  )
-}
+  );
+};
 
-export default React.memo(AppContent)
+export default React.memo(AppContent);
