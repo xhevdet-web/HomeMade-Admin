@@ -1,0 +1,10 @@
+.simplebar-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.sidebar-brand-full {
+  min-height: calc(5rem + 1px);
+  object-fit: contain;
+}

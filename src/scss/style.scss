@@ -1,0 +1,24 @@
+// If you want to override variables do it here
+@import 'variables';
+@import 'react-datepicker/dist/react-datepicker.css';
+
+// Import styles
+@import '@coreui/coreui/scss/coreui';
+@import '@coreui/chartjs/scss/coreui-chartjs';
+
+// Vendors
+@import 'vendors/simplebar';
+
+// Custom styles for this theme
+@import 'theme';
+
+// If you want to add custom CSS you can put it here
+@import 'custom';
+
+@import './vendors/toasts.scss';
+@import './vendors/modals.scss';
+@import './vendors/preloades.scss';
+@import './vendors/pagination.scss';
+@import './vendors/multi-select.scss';
+@import './vendors/professor-multi-select.scss';
+@import './vendors/qrCodeScan.scss';

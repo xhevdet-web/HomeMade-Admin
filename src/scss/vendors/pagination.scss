@@ -1,0 +1,19 @@
+.pagination {
+  border-color: transparent !important;
+}
+
+.page-link.active,
+.active > .page-link {
+  padding: 4px 10px 4px 10px;
+  border-color: transparent !important;
+  background-color: #3d99f5;
+  color: white !important;
+  border-radius: 8px;
+}
+.page-link {
+  padding: 4px 10px 4px 10px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--cui-secondary-color) !important;
+  border: transparent !important;
+}
