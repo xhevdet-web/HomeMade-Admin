@@ -11,7 +11,6 @@ import NotificationsModal from "./NotificationsModal";
 import ConfirmationModal from "./ConfirmationModal";
 import ListTypeModal from './ListTypeModal'
 import ListItemsModal from './ListsItemsModal'
-import EmployeesModal from "./EmployeesModal";
 export {
   NoAccessModal,
   TermsAndConditions,
@@ -26,5 +25,4 @@ export {
   ConfirmationModal,
   ListItemsModal,
   ListTypeModal,
-  EmployeesModal,
 };

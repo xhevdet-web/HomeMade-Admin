@@ -19,26 +19,6 @@ const componentMap = {
   Login: React.lazy(() => import("../views/pages/login/Login")), // Ensure Page404 is included in your lazy imports
 
   Page404: React.lazy(() => import("../views/pages/page404/Page404")), // Ensure Page404 is included in your lazy imports
-  Employees: React.lazy(() => import("../views/base/employees/Employees")),
-  EmployeeDetails: React.lazy(
-    () => import("../views/base/employees/EmployeeDetails")
-  ),
-  CertificationTypes: React.lazy(
-    () => import("../views/base/lists/CertificationTypes")
-  ),
-  DepartmentTypes: React.lazy(
-    () => import("../views/base/lists/DepartmentTypes")
-  ),
-  DiplomaTypes: React.lazy(() => import("../views/base/lists/DiplomaTypes")),
-  EmployeeTypes: React.lazy(() => import("../views/base/lists/EmployeeTypes")),
-  SpecializationTypes: React.lazy(
-    () => import("../views/base/lists/SpecializationTypes")
-  ),
-  TechnologyTypes: React.lazy(
-    () => import("../views/base/lists/TechnologiesTypes")
-  ),
-  RateTypes: React.lazy(() => import("../views/base/lists/RateTypes")),
-  CurrencyTypes: React.lazy(() => import("../views/base/lists/CurrencyTypes")),
 };
 
 const AppContent = () => {

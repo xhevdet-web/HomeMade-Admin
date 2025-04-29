@@ -13,9 +13,9 @@ const Dashboard = () => {
             className="img-fluid mb-4"
             style={{ maxHeight: "150px" }}
           />
-          <h2 className="fw-bold mb-2">Welcome to the Team Management Platform</h2>
+          <h2 className="fw-bold mb-2">Welcome to the Initial Project</h2>
           <p className="text-muted fs-5">
-            This platform is built to manage employee information and CVs — all in one organized and accessible place.
+          This is our starting project. We use it as a base for all our future projects. It includes the basic setup and structure so we don’t have to start from scratch every time.
           </p>
         </CCol>
       </CRow>

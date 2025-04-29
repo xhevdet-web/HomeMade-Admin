@@ -10,7 +10,6 @@ import {
   ConfirmationModal,
   ListTypeModal,
   ListItemsModal,
-  EmployeesModal,
 } from "../views/modals";
 
 const ModalContext = createContext();
@@ -27,7 +26,6 @@ const modalComponents = {
   ConfirmationModal: ConfirmationModal,
   ListTypeModal,
   ListItemsModal: ListItemsModal,
-  EmployeesModal,
 };
 
 const HandleModals = ({ children }) => {

@@ -103,15 +103,7 @@ const Login = () => {
                         autoComplete="current-password"
                       />
                     </CInputGroup>
-                    {/* <CFormCheck
-                      id="RememberMe"
-                      name="rememberMe"
-                      checked={data.rememberMe}
-                      onChange={handleInputChange}
-                      className="mb-2"
-                      label="Remember me!"
-                    /> */}
-
+            
                     <CRow className='mt-3'>
                       <CCol xs={6}>
                         <CButton
@@ -125,9 +117,7 @@ const Login = () => {
                         </CButton>
                       </CCol>
                       <CCol xs={6} className="text-right">
-                        {/* <CButton color="link" className="px-0">
-                          Forgot password?
-                        </CButton> */}
+                  
                       </CCol>
                     </CRow>
                   </CForm>
@@ -137,11 +127,9 @@ const Login = () => {
                 <CCardBody className="text-center d-flex align-items-center">
                   <div>
                     <CImage className="col-8 " src={SIMSLogo} alt="SIMS" />
-                    {/* <h2>SIMS</h2> */}
                     <p>
-                      Mirë se erdhët në platformën e menaxhimit të STAFIT
+                      Mirë se erdhët në Initial Project
                     </p>
-                    {/* <hr /> */}
                   </div>
                 </CCardBody>
               </CCard>
