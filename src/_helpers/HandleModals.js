@@ -10,8 +10,9 @@ import {
   ConfirmationModal,
   ListTypeModal,
   ListItemsModal,
+  
 } from "../views/modals";
-
+import RoleDelegationRights from "../views/modals/RoleDelegationRights";
 const ModalContext = createContext();
 
 export const useModal = () => useContext(ModalContext);
@@ -26,6 +27,7 @@ const modalComponents = {
   ConfirmationModal: ConfirmationModal,
   ListTypeModal,
   ListItemsModal: ListItemsModal,
+  RoleDelegationRights: RoleDelegationRights,
 };
 
 const HandleModals = ({ children }) => {

@@ -8,13 +8,12 @@ import {
   CTableHeaderCell,
   CTableBody,
   CTableDataCell,
+  CButton,
 } from '@coreui/react'
 import avatar2 from 'src/assets/images/avatars/2.jpg'
 import { cibCcVisa, cibSuperuser, cifBr } from '@coreui/icons'
 import { useLocation } from 'react-router-dom'
 import { useModal } from '../../../_helpers/HandleModals'
-
-import { CustomButton } from '../../../components'
 
 const ActionPrivilege = () => {
   const { showModal } = useModal()
@@ -61,9 +60,14 @@ const ActionPrivilege = () => {
         </CCol>
 
         <CCol sm={5} className="text-end">
-          <CustomButton actionType="create" onClick={() => showModal('AddActionFunction')}>
+          <CButton
+            size="sm"
+            color="info"
+            className="text-white text-bold px-4 "
+            onClick={() => showModal('AddActionFunction')}
+          >
             CREATE NEW
-          </CustomButton>
+          </CButton>
         </CCol>
       </CRow>
       <CTable align="middle" className="mb-0 border" hover responsive>
