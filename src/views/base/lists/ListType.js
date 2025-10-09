@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   CCol,
   CRow,
@@ -14,12 +14,21 @@ import {
 } from "@coreui/react";
 import { useModal } from "../../../_helpers/HandleModals";
 import useAxios from "../../../utils/useAxios";
+import { checkUserPermissions } from "../../../_helpers";
+import { CustomButton } from "../../../components";
+import { useSidebarSelector } from "../../../redux/selectors/sidebarSelector";
+import { useAuthSelector } from "../../../redux/selectors/authSelectors";
 
 const ListType = () => {
   const navigate = useNavigate();
   const { showModal } = useModal();
   const [listTypes, setListTypes] = useState([]);
   const { axiosRequest } = useAxios();
+  const { sidebarData } = useSidebarSelector()
+  const { userData } = useAuthSelector()
+  const location = useLocation()
+    const navItem = sidebarData?.find((el) => el.to === location.pathname)
+  const roleId = userData.role_id
 
   const getAllListTypes = async () => {
     try {
@@ -105,14 +114,16 @@ const ListType = () => {
                 </CTableDataCell>
 
                 <CTableDataCell className="text-center">
-                  <CButton
+               {checkUserPermissions(navItem, 'update', roleId) && (
+                         <CButton
                     size="sm"
                     color="warning"
                     className="text-white text-bold px-3 me-2"
                     onClick={() => handleModify(item)}
                   >
                     Modify
-                  </CButton>
+                  </CButton> 
+                                  )}
                   <CButton
                     size="sm"
                     color="danger"

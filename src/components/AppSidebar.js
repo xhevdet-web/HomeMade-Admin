@@ -27,7 +27,7 @@ const AppSidebar = () => {
   const selectedTheme = useTheme()
   const dispatch = useDispatch()
 
-  const { filteredSidebarData } = useSidebarSelector()
+  const { filteredSidebarData, currentView } = useSidebarSelector()
 
   const unfoldable = useSelector((state) => state.ui.sidebarUnfoldable)
   const sidebarShow = useSelector((state) => state.ui.sidebarShow)

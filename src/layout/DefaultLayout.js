@@ -4,16 +4,18 @@ import { useDispatch } from 'react-redux'
 import useAxios from '../utils/useAxios'
 import { setSidebarData } from '../redux/actions/sidebarActionTypes'
 import { useAuthSelector } from '../redux/selectors/authSelectors'
+import { useRouteSync } from '../hooks/useRouteSync'
 
 const DefaultLayout = () => {
-
   const { axiosRequest } = useAxios()
   const dispatch = useDispatch()
   const { userData } = useAuthSelector()
-  // console.log('userData', userData)
+  
+  // Sync current view with route
+  useRouteSync()
+  
   const getNavData = async () => {
     const { data } = await axiosRequest(`/nav/in-role/${userData.role_id}`, 'get',)
-    // console.log('sidebar data', data)
     dispatch(setSidebarData(data))
   }
 

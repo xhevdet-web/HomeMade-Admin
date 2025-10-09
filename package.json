@@ -34,6 +34,7 @@
     "chart.js": "^4.4.2",
     "classnames": "^2.5.1",
     "core-js": "^3.36.1",
+    "crypto-js": "^4.2.0",
     "dotenv": "^16.4.7",
     "env": "^0.0.2",
     "esri-leaflet": "^3.0.2",

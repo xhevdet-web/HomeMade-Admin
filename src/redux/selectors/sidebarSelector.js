@@ -1,10 +1,11 @@
 import { useSelector } from 'react-redux'
 
-// Custom hook to select authentication state
+// Custom hook to select sidebar state
 export const useSidebarSelector = () => {
   const sidebarData = useSelector((state) => state?.sidebar?.links)
+  const currentView = useSelector((state) => state?.sidebar?.current_view)
   const filteredSidebarData = sidebarData?.filter((link) => link?.is_nav)
-  return { sidebarData, filteredSidebarData }
+  return { sidebarData, filteredSidebarData, currentView }
 }
 
 // Example usage:

@@ -48,7 +48,7 @@ const useAxios = () => {
           setIsLoading(false)
           showToast('async', 'hide')
           if (method !== 'get') {
-          showToast(
+            showToast(
               error?.response?.data?.status || 'Error',
               error?.response?.data?.message || 'Server error!',
             )

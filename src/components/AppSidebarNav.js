@@ -1,12 +1,15 @@
 /* eslint-disable no-unused-vars */
 import React from 'react'
 import { NavLink } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
 import PropTypes from 'prop-types'
 import SimpleBar from 'simplebar-react'
 import 'simplebar-react/dist/simplebar.min.css'
 
 import { CBadge, CNavLink, CSidebarNav, CNavItem, CNavTitle, CNavGroup } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
+import { setCurrentView } from '../redux/actions/sidebarActionTypes'
+import { useSidebarSelector } from '../redux/selectors/sidebarSelector'
 
 import {
   cilDescription,
@@ -72,7 +75,14 @@ let icons = [
 ]
 
 export const AppSidebarNav = ({ items }) => {
-  const handleClick = () => {
+  const dispatch = useDispatch()
+  const { currentView } = useSidebarSelector()
+
+  const handleClick = (e, id) => {
+    if (id) {
+      dispatch(setCurrentView(id))
+    }
+    // Uncomment and modify this if you need payment validation
     // const isAllowed = HandlePaymentCheck({
     //   e,
     //   func: () => dispatch(setCurrentView(id)),
@@ -137,12 +147,12 @@ export const AppSidebarNav = ({ items }) => {
       } else if (component === 'CNavItem') {
         return (
           <Component as="div" key={id || index}>
-            {/* {console.log('items1', item, title, icon_name, badge)} */}
             {rest.to || rest.href ? (
               <CNavLink
-                onClick={(e) => handleClick(e, id)} // Pass the click event and id for validation
+                onClick={(e) => handleClick(e, id)}
                 {...(rest.to && { as: NavLink })}
                 {...rest}
+                className={currentView === id ? 'active' : ''}
               >
                 {navLink(title, icon_name, badge, indent)}
               </CNavLink>
@@ -184,5 +194,4 @@ export const AppSidebarNav = ({ items }) => {
 
 AppSidebarNav.propTypes = {
   items: PropTypes.arrayOf(PropTypes.any).isRequired,
-  unfinishedPayments: PropTypes.bool.isRequired, // Validate that unfinishedPayments is passed and is a boolean
 }
