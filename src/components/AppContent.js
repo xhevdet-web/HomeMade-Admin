@@ -15,7 +15,7 @@ const componentMap = {
   // Genders: React.lazy(() => import('../views/base/genders/Genders')),
   Dashboard: React.lazy(() => import("../views/dashboard/Dashboard")),
   RolePrivilege: React.lazy(() => import("../views/base/roles/RolePrivilege")),
-
+Profile: React.lazy(() => import("../views/base/users/Profile")),
   Login: React.lazy(() => import("../views/pages/login/Login")), // Ensure Page404 is included in your lazy imports
 
   Page404: React.lazy(() => import("../views/pages/page404/Page404")), // Ensure Page404 is included in your lazy imports

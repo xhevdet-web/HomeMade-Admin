@@ -1,84 +1,108 @@
-import React, { useEffect, useState } from 'react'
-import PropTypes from 'prop-types'
+// src/views/.../AddUser.jsx
+import React, { useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import {
-  CButton,
   CForm,
   CFormInput,
   CFormSelect,
+  CFormSwitch,
   CModal,
   CModalBody,
   CModalFooter,
   CModalHeader,
   CModalTitle,
   CSpinner,
-} from '@coreui/react'
-import useAxios from '../../utils/useAxios'
-import { useToast, useValidation } from '../../_helpers'
-import { CustomButton } from '../../components'
+} from "@coreui/react";
+import useAxios from "../../utils/useAxios";
+import { useValidation } from "../../_helpers";
+import { CustomButton } from "../../components";
 
-const AddUser = ({ message, handleModalClose, type, defaultData, callback }) => {
-  const [data, setData] = useState(
-    defaultData || {
-      first_name: '',
-      last_name: '',
-      email: '',
-      password: '',
-      role_id: ''
-    }
-  )
+/** Generates a strong temporary password (shown disabled). */
+const generateTempPassword = (len = 12) => {
+  const charset =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_-+=[]{};:,.?";
+  let out = "";
+  const cryptoObj = window.crypto || window.msCrypto;
+  if (cryptoObj?.getRandomValues) {
+    const buf = new Uint32Array(len);
+    cryptoObj.getRandomValues(buf);
+    for (let i = 0; i < len; i++) out += charset[buf[i] % charset.length];
+    return out;
+  }
+  for (let i = 0; i < len; i++) out += charset[Math.floor(Math.random() * charset.length)];
+  return out;
+};
 
-  const [roles, setRoles] = useState([])
-  const [loading, setLoading] = useState(true)
+const AddUser = ({ handleModalClose, type, defaultData = {}, callback }) => {
+  const isCreate = type === "create";
 
-  const { axiosRequest, isLoading } = useAxios()
-  const { validateForm, validated } = useValidation()
-  const { showToast } = useToast()
+  const [data, setData] = useState({
+    first_name: defaultData.first_name || "",
+    last_name: defaultData.last_name || "",
+    email: defaultData.email || "",
+    password: isCreate ? generateTempPassword() : "",
+    role_id: defaultData.role_id || defaultData?.role?.id || "",
+    is_active: typeof defaultData.is_active === "boolean" ? defaultData.is_active : true,
+  });
+
+  const [roles, setRoles] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const { axiosRequest, isLoading } = useAxios();
+  const { validateForm, validated } = useValidation();
+
 
   const handleChange = (e) => {
-    const { name, value } = e.target
-    setData((prev) => ({ ...prev, [name]: value }))
-  }
+    const { name, value } = e.target;
+    setData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleActiveChange = (e) => {
+    setData((prev) => ({ ...prev, is_active: e.target.checked }));
+  };
+
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    // const form = e.target
-
-    // if (!validateForm(form)) {
-    //   e.stopPropagation()
-    //   return
-    // }
+    e.preventDefault();
+    const basePayload = {
+      first_name: data.first_name,
+      last_name: data.last_name,
+      email: data.email,
+      role_id: data.role_id,
+      center_ids: data.center_ids || [],
+      is_active: data.is_active,
+    };
 
     try {
-      const payload = {
-        first_name: data.first_name,
-        last_name: data.last_name,
-        email: data.email,
-        password: data.password,
-        role_id: data.role_id,
+      if (isCreate) {
+        const payload = { ...basePayload, password: data.password };
+        await axiosRequest("/users", "post", payload, handleModalClose);
+      } else {
+        await axiosRequest(`/users/${defaultData.id}`, "put", basePayload, handleModalClose);
       }
-      await axiosRequest('/auth/register', 'post', payload, handleModalClose)
-      callback()
-      // showToast('Success', 'User registered successfully.')
+      callback();
     } catch (error) {
-      showToast('Error', error?.response?.data?.message || 'Failed to register user.')
-      console.error('Registration Error:', error)
+      console.error("User save error:", error);
     }
-  }
+  };
 
-  const fetchRoles = async () => {
+   const fetchRolesAndCenters = async () => {
     try {
-      const { data } = await axiosRequest('user-roles/all', 'get')
-      setRoles(data)
+      const [{ data: rolesData }] = await Promise.all([
+        axiosRequest("/user-roles/all", "get"),
+      ]);
+      setRoles(rolesData || []);
+   
     } catch (error) {
-      console.error('Failed to fetch roles:', error)
+      console.error("Failed to fetch roles:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchRoles()
-  }, [])
+    fetchRolesAndCenters();
+  }, []);
 
   return (
     <CModal
@@ -86,19 +110,16 @@ const AddUser = ({ message, handleModalClose, type, defaultData, callback }) => 
       visible
       alignment="center"
       onClose={handleModalClose}
-      aria-labelledby="StaticBackdropExampleLabel"
+      aria-labelledby="AddUserModal"
     >
-      {loading ? (
-        <div className="text-center py-5">
-          <CSpinner />
-        </div>
-      ) : (
+ 
         <>
           <CModalHeader>
-            <CModalTitle id="StaticBackdropExampleLabel">
-              {type === 'edit' ? 'Edit User' : 'Add User'}
+            <CModalTitle id="AddUserModal">
+              {isCreate ? "Add User" : "Edit User"}
             </CModalTitle>
           </CModalHeader>
+
           <CForm onSubmit={handleSubmit} noValidate validated={validated}>
             <CModalBody>
               <CFormInput
@@ -127,19 +148,24 @@ const AddUser = ({ message, handleModalClose, type, defaultData, callback }) => 
                 floatingLabel="Email"
                 required
                 className="mt-2"
+                disabled={!isCreate} // email usually immutable on edit
               />
-              <CFormInput
-                type="password"
-                name="password"
-                value={data.password}
-                onChange={handleChange}
-                floatingLabel="Password"
-                required
-                className="mt-2"
-              />
+
+              {isCreate && (
+                <CFormInput
+                  type="text"
+                  name="password"
+                  value={data.password}
+                  onChange={() => {}}
+                  floatingLabel="Temporary Password (auto-generated)"
+                  className="mt-2"
+                  disabled
+                />
+              )}
+
               <CFormSelect
                 name="role_id"
-                value={data.role_id || ''}
+                value={data.role_id || ""}
                 onChange={handleChange}
                 floatingLabel="Select Role"
                 required
@@ -155,34 +181,52 @@ const AddUser = ({ message, handleModalClose, type, defaultData, callback }) => 
                 ))}
               </CFormSelect>
 
+              {/* Active switch */}
+              <div className="mt-3">
+                <CFormSwitch
+                  id="is_active"
+                  label={data.is_active ? "Active" : "Inactive"}
+                  checked={!!data.is_active}
+                  onChange={handleActiveChange}
+                />
+              </div>
+
+             
             </CModalBody>
+
             <CModalFooter>
-              <CustomButton type="button" actionType="secondary" onClick={handleModalClose}>
+              <CustomButton
+                type="button"
+                actionType="secondary"
+                onClick={handleModalClose}
+              >
                 Close
               </CustomButton>
-              <CustomButton type="submit" actionType="save" disabled={isLoading}>
+              <CustomButton
+                type="submit"
+                actionType="save"
+                disabled={isLoading}
+              >
                 {isLoading ? (
                   <>
                     <CSpinner size="sm" /> Saving...
                   </>
                 ) : (
-                  'Save'
+                  "Save"
                 )}
               </CustomButton>
             </CModalFooter>
           </CForm>
         </>
-      )}
     </CModal>
-  )
-}
+  );
+};
 
 AddUser.propTypes = {
-  message: PropTypes.string,
   handleModalClose: PropTypes.func.isRequired,
-  type: PropTypes.string.isRequired,
-  defaultData: PropTypes.object.isRequired,
-  callback: PropTypes.func.isRequired
-}
+  type: PropTypes.oneOf(["create", "edit"]).isRequired,
+  defaultData: PropTypes.object,
+  callback: PropTypes.func.isRequired,
+};
 
-export default AddUser
+export default AddUser;

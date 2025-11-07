@@ -1,427 +1,451 @@
-import { CButton, CCard, CCardBody, CCardHeader, CCardTitle, CCol, CContainer, CForm, CFormInput, CFormLabel, CFormSelect, CImage, CInputGroup, CInputGroupText, CListGroup, CListGroupItem, CRow, CSpinner } from '@coreui/react'
-import React, { useEffect, useState } from 'react'
-import ProfilePhoto from "../../../assets/images/profile-simple.svg"
-import CIcon from '@coreui/icons-react'
-import { cilPencil, cilAperture } from '@coreui/icons'
-import useAxios from '../../../utils/useAxios'
-import "../../../scss/_custom.scss"
-import { useAuthSelector } from '../../../redux/selectors/authSelectors'
-import { checkUserPermissions } from '../../../_helpers/UserInRole'
-import { useLocation } from 'react-router-dom'
-import { useSidebarSelector } from '../../../redux/selectors/sidebarSelector'
-import ResetPassword from './ResetPassword'
-import { CustomButton } from '../../../components'
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  CCard, CCardBody, CCardHeader,
+  CCol, CRow, CForm, CFormInput, CSpinner, CBadge,
+  CNav, CNavItem, CNavLink, CTabContent, CTabPane
+} from "@coreui/react";
+import useAxios from "../../../utils/useAxios";
+import { useToast } from "../../../_helpers";
+import { CustomButton } from "../../../components";
+import { useAuthSelector } from "../../../redux/selectors/authSelectors";
+// If you want global auth update on refresh, uncomment these:
+// import { useDispatch } from "react-redux";
+// import { setUser } from "../../../redux/slices/authSlice";
 
+// --- helpers ---
+const hasUpper = (s) => /[A-Z]/.test(s);
+const hasLower = (s) => /[a-z]/.test(s);
+const hasDigit = (s) => /[0-9]/.test(s);
+const isLenOk = (s) => typeof s === "string" && s.length >= 8;
+
+const passwordFeedback = (pwd) => {
+  if (!pwd) return { ok: false, msg: "" };
+  const missing = [];
+  if (!isLenOk(pwd)) missing.push("at least 8 characters");
+  if (!hasUpper(pwd)) missing.push("an uppercase letter");
+  if (!hasLower(pwd)) missing.push("a lowercase letter");
+  if (!hasDigit(pwd)) missing.push("a number");
+  if (missing.length === 0) return { ok: true, msg: "Looks good." };
+  const last = missing.pop();
+  const sentence = missing.length ? `${missing.join(", ")} and ${last}` : last;
+  return { ok: false, msg: `Password needs ${sentence}.` };
+};
+
+const getUserIdFromToken = () => {
+  try {
+    const token =
+      localStorage.getItem("access_token") ||
+      localStorage.getItem("token") ||
+      sessionStorage.getItem("access_token");
+    if (!token) return null;
+    const payload = token.split(".")[1];
+    const json = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+    return json?.user_data?.id || json?.sub || json?.id || null;
+  } catch {
+    return null;
+  }
+};
+
+const buildName = (u) => [u?.first_name, u?.last_name].filter(Boolean).join(" ");
+const extractRoleName = (u) => u?.users_role?.name || u?.role?.name || u?.role_name || "";
+
+// --- component ---
 const Profile = () => {
-  const { sidebarData } = useSidebarSelector()
-  const location = useLocation()
-  const navItem = sidebarData?.find((el) => el.to === location.pathname)
-  const { userData } = useAuthSelector()
-  const roleId = userData.role_id
+  const navigate = useNavigate();
   const { axiosRequest, isLoading } = useAxios();
+  const { showToast } = useToast();
+  const { userData } = useAuthSelector?.() || { userData: null };
+  // const dispatch = useDispatch(); // if using global auth update
 
-  const [data, setData] = useState({
-    id: "",
-    first_name: '',
-    last_name: '',
-    name: '',
-    username: '',
-    email: '',
-    profile_pic: '',
-    country_id: '',
-    city_id: '',
-    gender: '',
-    dob: '',
-    phone_number: '',
+  const [effectiveId, setEffectiveId] = useState("");
+  const [loadingUser, setLoadingUser] = useState(true);
+  const [userInfo, setUserInfo] = useState({ name: "", role: "", email: "" });
+
+  // tabs
+  const [activeKey, setActiveKey] = useState("profile");
+
+  // profile state
+  const [profileForm, setProfileForm] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
   });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileNonce, setProfileNonce] = useState(0);
 
-  const [isEditing, setIsEditing] = useState(false)
-  const [isResettingPassword, setIsResettingPassword] = useState(false)
-  const [isChanged, setIsChanged] = useState(false);
+  // password state
+  const [form, setForm] = useState({
+    current_password: "",
+    new_password: "",
+    confirm_password: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [resetNonce, setResetNonce] = useState(0);
 
-  const [genders, setGenders] = useState([])
-  const [countries, setCountries] = useState([])
-  const [cities, setCities] = useState([])
-  const [fetchedUser, setFetchedUser] = useState(true)
+  const newPwdFeedback = useMemo(
+    () => passwordFeedback(form.new_password),
+    [form.new_password]
+  );
+  const passwordsMatch = useMemo(
+    () => (form.confirm_password ? form.new_password === form.confirm_password : true),
+    [form.new_password, form.confirm_password]
+  );
 
-
-  const fetchUsersData = async () => {
-    const { data } = await axiosRequest('/auth/me', 'get')
-    setData(data)
-    setFetchedUser(false)
-
-  }
-
-  const getNeededData = async () => {
-    try {
-      const gendersDataPromise = axiosRequest('genders/all', 'get');
-      const citiesDataPromise = axiosRequest('cities/all', 'get');
-      const countriesDataPromise = axiosRequest('countries/all', 'get');
-
-      // Execute all requests concurrently
-      const [gendersData, citiesData, countriesData] = await Promise.all([
-        gendersDataPromise,
-        citiesDataPromise,
-        countriesDataPromise
-      ]);
-
-      setGenders(gendersData.data);
-      setCities(citiesData.data);
-      setCountries(countriesData.data);
-    } catch (error) {
-      console.error('Error fetching needed data:', error);
-    }
+  const hydrateFromUser = (u) => {
+    if (!u) return;
+    setUserInfo({
+      name: buildName(u),
+      role: extractRoleName(u),
+      email: u?.email || "",
+    });
+    setProfileForm({
+      first_name: u?.first_name || "",
+      last_name: u?.last_name || "",
+      email: u?.email || "",
+    });
   };
 
-
-  console.log("data", data)
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const url = `users/${data?.id}`;
-    const method = 'put';
-    const requestData = { ...data };
-
+  const fetchUser = async (id) => {
     try {
-      await axiosRequest(url, method, requestData);
-      setIsChanged(false);
-    } catch (error) {
-      console.error('Error submitting data:', error);
+      const resp = await axiosRequest(`/users/${id}`, "get");
+      const res = resp?.data ?? resp;
+      const u = res?.data ?? res;
+      if (u) {
+        hydrateFromUser(u);
+        // If you want the whole app to reflect changes immediately:
+        // dispatch(setUser(u));
+      }
+    } catch (e) {
+      console.error("Failed to refresh user", e);
     }
   };
-
-
-  const handleChange = (e) => {
-    const { value, name } = e.target
-
-    setData((prevState) => ({
-      ...prevState,
-      [name]: value,
-    }))
-    setIsChanged(true);
-  }
-
-
-  const handleEditClick = () => {
-    getNeededData()
-    setIsEditing(!isEditing)
-    setIsResettingPassword(false)
-  }
-
-  const handleResetPasswordClick = () => {
-    setIsResettingPassword(!isResettingPassword)
-    setIsEditing(false)
-  }
-
-  const handleProfileClick = () => {
-    setIsEditing(false)
-    setIsResettingPassword(false)
-  }
 
   useEffect(() => {
-    fetchUsersData()
-  }, [])
+    (async () => {
+      setLoadingUser(true);
+      // If we have ID from store, still fetch fresh user
+      if (userData?.id) {
+        setEffectiveId(userData.id);
+        await fetchUser(userData.id);
+        setLoadingUser(false);
+        return;
+      }
+      const idFromJwt = getUserIdFromToken();
+      if (idFromJwt) {
+        setEffectiveId(idFromJwt);
+        await fetchUser(idFromJwt);
+        setLoadingUser(false);
+        return;
+      }
+      try {
+        const resp = await axiosRequest("/auth/me", "get");
+        const res = resp?.data ?? resp;
+        const me = res?.data ?? res;
+        if (res?.status === "Success" && me?.id) {
+          setEffectiveId(me.id);
+          await fetchUser(me.id);
+        }
+      } finally {
+        setLoadingUser(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  console.log("isLoading", data)
+  // profile handlers
+  const onChangeProfile = (e) =>
+    setProfileForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+
+  const onSubmitProfile = async (e) => {
+    e.preventDefault();
+    if (!effectiveId) return;
+    const firstOk = profileForm.first_name.trim().length > 0;
+    const lastOk = profileForm.last_name.trim().length > 0;
+    if (!firstOk || !lastOk) return;
+
+    try {
+      setSavingProfile(true);
+      const payload = {
+        first_name: profileForm.first_name.trim(),
+        last_name: profileForm.last_name.trim(),
+      };
+      const resp = await axiosRequest(`/users/${effectiveId}`, "put", payload);
+      const res = resp?.data ?? resp;
+
+      if (res?.status === "Success") {
+        showToast("Success", "Profile updated.");
+        // Re-fetch from API to ensure we show the latest data everywhere
+        await fetchUser(effectiveId);
+        setProfileNonce((n) => n + 1);
+      }
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  // password handlers
+  const onChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    if (!effectiveId) return;
+    if (!form.current_password || !form.new_password || !form.confirm_password) return;
+    if (!newPwdFeedback.ok) return;
+    if (!passwordsMatch) return;
+
+    try {
+      setSubmitting(true);
+      const payload = {
+        current_password: form.current_password,
+        new_password: form.new_password,
+      };
+      const resp = await axiosRequest(`/users/${effectiveId}/password`, "patch", payload);
+      const res = resp?.data ?? resp;
+
+      if (res?.status === "Success") {
+        showToast("Success", "Password changed successfully.");
+        setForm({ current_password: "", new_password: "", confirm_password: "" });
+        setResetNonce((n) => n + 1);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loadingUser) {
+    return (
+      <div className="text-center py-5">
+        <CSpinner />
+      </div>
+    );
+  }
 
   return (
-    <>
-      {
-        fetchedUser ? (
-          <div className="text-center">
-            < CSpinner />
-          </div >)
-          :
-          <CContainer fluid>
-            <CCard className="shadow rounded mb-4">
-              <CCardHeader>
-                <CRow>
-                  <CCol className='d-flex gap-2'>
+    <CRow>
+      <CCol md={12}>
+        <CCard>
+          <CCardHeader>
+            Account Settings
+            {(userInfo.name || userInfo.role) && (
+              <div className="mt-2 small">
+                <strong>{userInfo.name || "User"}</strong>{" "}
+                {userInfo.role && (
+                  <CBadge color="secondary" className="ms-2">
+                    {userInfo.role}
+                  </CBadge>
+                )}
+              </div>
+            )}
+          </CCardHeader>
+
+          <CCardBody>
+            {/* Tabs */}
+            <CNav variant="tabs" role="tablist" className="mb-3">
+              <CNavItem role="presentation">
+                <CNavLink
+                  href="#"
+                  active={activeKey === "profile"}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setActiveKey("profile");
+                  }}
+                >
+                  Profile
+                </CNavLink>
+              </CNavItem>
+              <CNavItem role="presentation">
+                <CNavLink
+                  href="#"
+                  active={activeKey === "password"}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setActiveKey("password");
+                  }}
+                >
+                  Change Password
+                </CNavLink>
+              </CNavItem>
+            </CNav>
+
+            <CTabContent>
+              {/* Profile Tab */}
+              <CTabPane visible={activeKey === "profile"}>
+                <CForm key={profileNonce} onSubmit={onSubmitProfile} autoComplete="off">
+                  <CRow className="g-3">
+                    <CCol md={6}>
+                      <CFormInput
+                        type="text"
+                        name="first_name"
+                        label="First Name"
+                        value={profileForm.first_name}
+                        onChange={onChangeProfile}
+                        required
+                        disabled={savingProfile || isLoading}
+                      />
+                    </CCol>
+                    <CCol md={6}>
+                      <CFormInput
+                        type="text"
+                        name="last_name"
+                        label="Last Name"
+                        value={profileForm.last_name}
+                        onChange={onChangeProfile}
+                        required
+                        disabled={savingProfile || isLoading}
+                      />
+                    </CCol>
+                    <CCol md={12}>
+                      <CFormInput
+                        type="email"
+                        name="email"
+                        label="Email"
+                        value={profileForm.email}
+                        disabled
+                      />
+                      <small className="text-muted">
+                        Email is shown for reference and cannot be changed here.
+                      </small>
+                    </CCol>
+                  </CRow>
+
+                  <div className="d-flex gap-2 mt-4">
                     <CustomButton
-                      onClick={handleProfileClick}
-                      active={!isEditing && !isResettingPassword}
-                      actionType="profile"
+                      actionType="secondary"
+                      type="button"
+                      onClick={() => navigate(-1)}
+                      disabled={savingProfile}
                     >
-                      Profile
+                      Back
                     </CustomButton>
-
-                    {checkUserPermissions(navItem, 'update', roleId) && (
-                      <CustomButton
-                        onClick={handleEditClick}
-                        active={isEditing}
-                        actionType="profile"
-                      >
-                        Edit Profile
-                      </CustomButton>
-                    )}
-
                     <CustomButton
-                      onClick={handleResetPasswordClick}
-                      active={isResettingPassword}
-                      actionType="profile"
+                      actionType="save"
+                      type="submit"
+                      disabled={
+                        savingProfile ||
+                        isLoading ||
+                        !profileForm.first_name.trim() ||
+                        !profileForm.last_name.trim()
+                      }
                     >
-                      Reset Password
+                      {savingProfile ? (
+                        <>
+                          <CSpinner size="sm" /> Saving...
+                        </>
+                      ) : (
+                        "Save Changes"
+                      )}
                     </CustomButton>
+                  </div>
+                </CForm>
+              </CTabPane>
 
-                  </CCol>
-                </CRow>
-              </CCardHeader>
+              {/* Password Tab */}
+              <CTabPane visible={activeKey === "password"}>
+                <CForm key={resetNonce} onSubmit={onSubmit} autoComplete="off">
+                  <CFormInput
+                    type="password"
+                    name="current_password"
+                    label="Current Password"
+                    className="mb-3"
+                    autoComplete="current-password"
+                    value={form.current_password}
+                    onChange={onChange}
+                    required
+                    disabled={submitting || isLoading}
+                  />
 
-              <CCardBody className="p-0">
-                <CContainer fluid className="mt-5">
-                  <CForm onSubmit={handleSubmit} className="mb-4">
-                    <CRow>
-                      <CCol md={4} xs={12} className="mb-2">
-                        <CCardBody className="border rounded">
-                          <CRow className="d-flex justify-content-center align-items-center">
-                            <CCol className="text-center">
-                              <CImage
-                                className="rounded-circle border"
-                                src={import.meta.env.VITE_IMAGES_API + data?.profile_pic || ProfilePhoto}
-                                alt="Profile Photo"
-                                width={180}
-                                height={180}
-                              // type="file"
-                              // onChange={handleChange}
-                              // name="profile_pic"
-                              // id="profile_pic"
-                              // aria-label="photo input example"
-                              />
-                              <h2 className="mt-3 mb-0">
-                                {data?.first_name} {data?.last_name}
-                              </h2>
-                              <h6 className="mt-1 mb-5 text-secondary">
-                                {data?.users_role?.name}
-                              </h6>
-                            </CCol>
-                          </CRow>
-                        </CCardBody>
-                      </CCol>
-                      <CCol md={8} xs={12} className="mb-2">
-                        <CListGroup flush>
-                          {isResettingPassword ? (
-                            <>
-                              <ResetPassword />
+                  <CFormInput
+                    type="password"
+                    name="new_password"
+                    label="New Password"
+                    className="mb-1"
+                    autoComplete="new-password"
+                    value={form.new_password}
+                    onChange={onChange}
+                    required
+                    disabled={submitting || isLoading}
+                  />
+                  <small
+                    className={`d-block mb-3 ${
+                      !form.new_password
+                        ? "text-muted"
+                        : newPwdFeedback.ok
+                        ? "text-success"
+                        : "text-danger"
+                    }`}
+                  >
+                    {!form.new_password
+                      ? "Must be at least 8 characters and include upper, lower and a number."
+                      : newPwdFeedback.msg}
+                  </small>
 
-                            </>
-                          ) : (
-                            <>
-                              <CRow>
-                                <CCol md={12}>
-                                  <CInputGroup className="mb-1">
-                                    <CFormLabel className="py-3 ps-3 pe-0 col-6 d-flex justify-content-between border-0 text-muted" style={{ backgroundColor: 'var(--cui-secondary-bg)' }}>
-                                      <div>Email</div>
-                                    </CFormLabel>
-                                    <CFormInput
-                                      type="email"
-                                      name="email"
-                                      id="email"
-                                      placeholder="Email"
-                                      disabled={!isEditing}
-                                      defaultValue={data?.email}
-                                      value={data?.email}
-                                      onChange={handleChange}
-                                      className='col-6 text-start input-group-text border-0'
-                                    />
-                                  </CInputGroup>
+                  <CFormInput
+                    type="password"
+                    name="confirm_password"
+                    label="Confirm New Password"
+                    className="mb-1"
+                    autoComplete="new-password"
+                    value={form.confirm_password}
+                    onChange={onChange}
+                    required
+                    disabled={submitting || isLoading}
+                    invalid={!!form.confirm_password && !passwordsMatch}
+                    valid={!!form.confirm_password && passwordsMatch}
+                  />
+                  <small
+                    className={`d-block mb-3 ${
+                      !form.confirm_password
+                        ? "text-muted"
+                        : passwordsMatch
+                        ? "text-success"
+                        : "text-danger"
+                    }`}
+                  >
+                    {!form.confirm_password
+                      ? "Re-enter the new password."
+                      : passwordsMatch
+                      ? "Passwords match."
+                      : "Passwords do not match."}
+                  </small>
 
-                                  {/* <CInputGroup className="mb-1"> */}
-                                  {/* <CFormLabel className="py-3 ps-3 pe-0 col-6 d-flex justify-content-between border-0" style={{ backgroundColor: 'var(--cui-secondary-bg)' }}>
-                                <div>Drejtimi</div>
-                              </CFormLabel>
-                              <CFormInput
-                                type="text"
-                                id="drejtimi"
-                                name="major"
-                                placeholder="Drejtimi"
-                                disabled={!isEditing}
-                                defaultValue={data?.email}
-                                onChange={handleChange}
-                                className='col-6 text-start input-group-text border-0'
-                              /> */}
-                                  {/* </CInputGroup> */}
+                  <div className="d-flex gap-2">
+                    <CustomButton
+                      actionType="secondary"
+                      type="button"
+                      onClick={() => navigate(-1)}
+                      disabled={submitting}
+                    >
+                      Back
+                    </CustomButton>
+                    <CustomButton
+                      actionType="save"
+                      type="submit"
+                      disabled={
+                        submitting ||
+                        isLoading ||
+                        !form.current_password ||
+                        !newPwdFeedback.ok ||
+                        !passwordsMatch
+                      }
+                    >
+                      {submitting ? (
+                        <>
+                          <CSpinner size="sm" /> Saving...
+                        </>
+                      ) : (
+                        "Change Password"
+                      )}
+                    </CustomButton>
+                  </div>
+                </CForm>
+              </CTabPane>
+            </CTabContent>
+          </CCardBody>
+        </CCard>
+      </CCol>
+    </CRow>
+  );
+};
 
-                                  <CInputGroup className="mb-1">
-                                    <CFormLabel className="py-3 ps-3 pe-0 col-6 d-flex justify-content-between border-0 text-muted" style={{ backgroundColor: 'var(--cui-secondary-bg)' }}>
-                                      <div>Country</div>
-                                    </CFormLabel>
-
-                                    {!isEditing ? <CFormInput
-                                      type="text"
-                                      name="country_id"
-                                      id="country_id"
-                                      placeholder="Country"
-                                      disabled={!isEditing}
-                                      defaultValue={data?.country.name}
-                                      value={data?.country.name}
-                                      onChange={handleChange}
-                                      className='col-6 text-start input-group-text border-0'
-                                    />
-                                      :
-                                      <CFormSelect
-                                        name="country_id"
-                                        disabled={!isEditing}
-                                        defaultValue={data.country_id}
-                                        value={data.country_id}
-                                        onChange={handleChange}
-                                        className="form-select col-6 text-start input-group-text border-0 "
-                                      >
-                                        <option value="" hidden disabled>
-                                          Select Country
-                                        </option>
-                                        {countries.map((country) => (
-                                          <option key={country.id} value={country.id}>
-                                            {country.name}
-                                          </option>
-                                        ))}
-                                      </CFormSelect>
-                                    }
-                                  </CInputGroup>
-
-                                  <CInputGroup className="mb-1">
-                                    <CFormLabel className="py-3 ps-3 pe-0 col-6 d-flex justify-content-between border-0 text-muted" style={{ backgroundColor: 'var(--cui-secondary-bg)' }}>
-                                      <div>City</div>
-                                    </CFormLabel>
-
-
-
-                                    {!isEditing ? <CFormInput
-                                      type="text"
-                                      name="city_id"
-                                      id="city_id"
-                                      placeholder="City"
-                                      disabled={!isEditing}
-                                      defaultValue={data?.city.name}
-                                      value={data?.city.name}
-                                      onChange={handleChange}
-                                      className='col-6 text-start input-group-text border-0'
-                                    />
-                                      :
-
-
-                                      <CFormSelect
-                                        name="city_id"
-                                        defaultValue={data.city_id}
-                                        value={data.city_id}
-                                        disabled={!isEditing}
-                                        onChange={handleChange}
-                                        className="col-6 text-start input-group-text border-0 "
-                                      >
-                                        <option value="" hidden disabled>
-                                          Select City
-                                        </option>
-                                        {cities.map((city) => (
-                                          <option key={city.id} value={city.id}>
-                                            {city.name}
-                                          </option>
-                                        ))}
-                                      </CFormSelect>
-                                    }
-                                  </CInputGroup>
-
-
-
-                                  <CInputGroup className="mb-1">
-                                    <CFormLabel className="py-3 ps-3 pe-0 col-6 d-flex justify-content-between border-0 text-muted" style={{ backgroundColor: 'var(--cui-secondary-bg)' }}>
-                                      <div>Gender</div>
-                                    </CFormLabel>
-
-
-                                    {!isEditing ? <CFormInput
-                                      type="text"
-                                      name="gender_id"
-                                      id="gender_id"
-                                      placeholder="Gender"
-                                      disabled={!isEditing}
-                                      defaultValue={data?.gender.name}
-                                      value={data?.gender.name}
-                                      onChange={handleChange}
-                                      className='col-6 text-start input-group-text border-0'
-                                    />
-                                      :
-
-
-                                      <CFormSelect
-                                        name="gender_id"
-                                        disabled={!isEditing}
-                                        defaultValue={data.gender_id}
-                                        value={data.gender_id}
-                                        onChange={handleChange}
-                                        className=" col-6 text-start input-group-text border-0 "
-                                      >
-                                        <option value="" hidden disabled>
-                                          Select Gender
-                                        </option>
-                                        {genders.map((el, index) => (
-                                          <option key={index} value={el.id}>
-                                            {el.name}
-                                          </option>
-                                        ))}
-                                      </CFormSelect>
-                                    }
-                                  </CInputGroup>
-
-                                  <CInputGroup className="mb-1">
-                                    <CFormLabel className="py-3 ps-3 pe-0 col-6 d-flex justify-content-between border-0 text-muted" style={{ backgroundColor: 'var(--cui-secondary-bg)' }}>
-                                      <div>Date of birth</div>
-                                    </CFormLabel>
-                                    <CFormInput
-                                      type="date"
-                                      id="dob"
-                                      name="dob"
-                                      placeholder="Date of Birth"
-                                      disabled={!isEditing}
-                                      defaultValue={data?.dob?.slice(0, 10)}
-                                      onChange={handleChange}
-                                      className='col-6 text-start input-group-text border-0'
-                                    />
-                                  </CInputGroup>
-
-                                  <CInputGroup className="mb-1">
-                                    <CFormLabel className="py-3 ps-3 pe-0 col-6 d-flex justify-content-between border-0 text-muted" style={{ backgroundColor: 'var(--cui-secondary-bg)' }}>
-                                      <div>Phone Number</div>
-                                    </CFormLabel>
-                                    <CFormInput
-                                      type="number"
-                                      id="phone_number"
-                                      name="phone_number"
-                                      placeholder="Phone Number"
-                                      disabled={!isEditing}
-                                      defaultValue={data?.phone_number}
-                                      onChange={handleChange}
-                                      className='col-6 text-start input-group-text border-0'
-                                    />
-                                  </CInputGroup>
-                                </CCol>
-                              </CRow>
-                            </>
-                          )}
-                          <CRow>
-                            <CCol className="text-end small text-muted">
-                              <span className="small">
-                                {/* Created at: {data?.createdAt?.slice(0, 10)} <br /> */}
-                                Last updated at: {data?.updatedAt?.slice(0, 10).replace(/-/g, '/')}, {data?.updatedAt?.slice(11, 19)}
-                              </span>
-                            </CCol>
-                            {isEditing && (
-                              <CCol md={12} className="d-flex justify-content-end mt-1 mb-2">
-                                <CustomButton disabled={!isChanged} actionType="edit" type="submit">Update</CustomButton>
-                              </CCol>
-                            )}
-                          </CRow>
-                        </CListGroup>
-                      </CCol>
-                    </CRow>
-                  </CForm>
-                </CContainer>
-              </CCardBody>
-            </CCard>
-          </CContainer>
-      }
-    </>
-
-  )
-}
-
-
-
-export default Profile
+export default Profile;
