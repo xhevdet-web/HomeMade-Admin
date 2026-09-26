@@ -1,3 +1,16 @@
+# HomeMade Admin Studio
+
+This existing React + Vite/CoreUI template now contains the HomeMade admin shell. Classic Redux, Redux Persist, HashRouter and the Sass architecture are preserved.
+
+Run `npm.cmd install`, then `npm.cmd run dev` from this directory. Open **http://localhost:8081/#/login** and sign in with an existing backend ADMIN account. NestJS runs separately at `http://localhost:3000/api/v1`.
+
+Copy `.env.example` to `.env` if setting up a fresh checkout. Never place signing secrets in Vite environment variables.
+
+See [the implementation report](HOMEMADE_IMPLEMENTATION.md) for the architecture, changed files, auth flow, available/missing API endpoints, test commands and existing lint limitations. Most business endpoints and backend ADMIN guards are not implemented yet.
+
+The original template documentation follows.
+
+---
 
 # Initial Project - Front
 
