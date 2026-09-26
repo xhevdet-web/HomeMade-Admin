@@ -28,7 +28,7 @@ const ListType = () => {
   const { userData } = useAuthSelector()
   const location = useLocation()
     const navItem = sidebarData?.find((el) => el.to === location.pathname)
-  const roleId = userData.role_id
+  const roleId = userData?.role_id
 
   const getAllListTypes = async () => {
     try {

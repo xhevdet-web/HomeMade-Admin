@@ -1,132 +1,37 @@
-import React, { useEffect, useRef, useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
-import {
-  CContainer,
-  CDropdown,
-  CDropdownItem,
-  CDropdownMenu,
-  CDropdownToggle,
-  CHeader,
-  CHeaderNav,
-  CHeaderToggler,
-  useColorModes,
-} from "@coreui/react";
-import CIcon from "@coreui/icons-react";
-import {
-  cifAl,
-  cifRs,
-  cifUs,
-  cilContrast,
-  cilLanguage,
-  cilMenu,
-  cilMoon,
-  cilSun,
-} from "@coreui/icons";
+import { useDispatch, useSelector } from 'react-redux'
+import { useLocation } from 'react-router-dom'
+import { CContainer, CHeader, CHeaderToggler } from '@coreui/react'
+import CIcon from '@coreui/icons-react'
+import { cilMenu } from '@coreui/icons'
+import { setSidebarShow } from '../redux/actions/uiActions'
+import { useAuthSelector } from '../redux/selectors/authSelectors'
+import navigation from '../navigation'
 
-import { AppBreadcrumb } from "./index";
-import { AppHeaderDropdown } from "./header/index";
-import { setSidebarShow, setThemeMode } from "../redux/actions/uiActions";
-import useAxios from "./../utils/useAxios";
-
-const AppHeader = ({ unfinishedPayments }) => {
-  const { axiosRequest } = useAxios();
-  const headerRef = useRef();
-  const dispatch = useDispatch();
-  const { colorMode, setColorMode } = useColorModes("sims-template-theme");
-
-  const [, setSelectedLanguage] = useState(null);
-  const setColorModeFunction = (mode) => {
-    setColorMode(mode);
-    dispatch(setThemeMode(mode));
-  };
-
-  const sidebarShow = useSelector((state) => state.ui.sidebarShow);
-
-  let icons = [
-    { name: "cifAl", icon: cifAl },
-    { name: "cifUs", icon: cifUs },
-    { name: "cifRs", icon: cifRs },
-  ];
-
-  useEffect(() => {
-    document.addEventListener("scroll", () => {
-      headerRef.current &&
-        headerRef.current.classList.toggle(
-          "shadow-sm",
-          document.documentElement.scrollTop > 0
-        );
-    });
-  }, []);
-
-  const handleSidebarToggle = () => {
-    // Simply toggle the sidebar using redux dispatch
-    dispatch(setSidebarShow(!sidebarShow));
-  };
-
+const AppHeader = () => {
+  const dispatch = useDispatch()
+  const visible = useSelector((state) => state.ui.sidebarShow)
+  const { pathname } = useLocation()
+  const { userData } = useAuthSelector()
+  const title = navigation.find((route) => route.to === pathname)?.title || 'Dashboard'
   return (
-    <CHeader position="sticky" className="mb-4 p-0" ref={headerRef}>
-      <CContainer className="border-bottom px-4" fluid>
-        <CHeaderToggler
-          onClick={handleSidebarToggle} // Fix: Handle sidebar toggle here
-          style={{ marginInlineStart: "-14px" }}
-        >
-          <CIcon icon={cilMenu} size="lg" />
-        </CHeaderToggler>
-        <CHeaderNav>
-          <li className="nav-item py-1">
-            <div className="vr h-100 mx-2 text-body text-opacity-75"></div>
-          </li>
-          <CDropdown variant="nav-item" placement="bottom-end">
-            <CDropdownToggle caret={false}>
-              {colorMode === "dark" ? (
-                <CIcon icon={cilMoon} size="lg" />
-              ) : colorMode === "auto" ? (
-                <CIcon icon={cilContrast} size="lg" />
-              ) : (
-                <CIcon icon={cilSun} size="lg" />
-              )}
-            </CDropdownToggle>
-            <CDropdownMenu>
-              <CDropdownItem
-                active={colorMode === "light"}
-                className="d-flex align-items-center"
-                as="button"
-                type="button"
-                onClick={() => setColorModeFunction("light")}
-              >
-                <CIcon className="me-2" icon={cilSun} size="lg" /> Light
-              </CDropdownItem>
-              <CDropdownItem
-                active={colorMode === "dark"}
-                className="d-flex align-items-center"
-                as="button"
-                type="button"
-                onClick={() => setColorModeFunction("dark")}
-              >
-                <CIcon className="me-2" icon={cilMoon} size="lg" /> Dark
-              </CDropdownItem>
-              <CDropdownItem
-                active={colorMode === "auto"}
-                className="d-flex align-items-center"
-                as="button"
-                type="button"
-                onClick={() => setColorModeFunction("auto")}
-              >
-                <CIcon className="me-2" icon={cilContrast} size="lg" /> Auto
-              </CDropdownItem>
-            </CDropdownMenu>
-          </CDropdown>
-          <li className="nav-item py-1">
-            <div className="vr h-100 mx-2 text-body text-opacity-75"></div>
-          </li>
-          <AppHeaderDropdown unfinishedPayments={unfinishedPayments} />
-        </CHeaderNav>
-      </CContainer>
-      <CContainer className="px-4" fluid>
-        <AppBreadcrumb />
+    <CHeader position="sticky" className="hm-header">
+      <CContainer fluid>
+        <div className="d-flex align-items-center gap-3">
+          <CHeaderToggler
+            aria-label="Toggle navigation"
+            onClick={() => dispatch(setSidebarShow(!visible))}
+          >
+            <CIcon icon={cilMenu} />
+          </CHeaderToggler>
+          <span className="hm-header-title">{title}</span>
+        </div>
+        <div className="hm-header-account">
+          <span className="hm-status-dot" />
+          <span>Admin workspace</span>
+          <span className="hm-avatar">{userData?.firstName?.[0] || 'A'}</span>
+        </div>
       </CContainer>
     </CHeader>
-  );
-};
-
-export default AppHeader;
+  )
+}
+export default AppHeader

@@ -1,74 +1,51 @@
-import React, { Suspense } from "react";
-import { Route, Routes } from "react-router-dom";
-import { CContainer, CSpinner } from "@coreui/react";
-import HandleAlerts from "../_helpers/HandleAlerts";
-import Page404 from "../views/pages/page404/Page404";
-import { useSidebarSelector } from "../redux/selectors/sidebarSelector";
-import Preloader from "./Preloader";
+import React, { Suspense } from 'react'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { CContainer, CSpinner } from '@coreui/react'
+import navigation from '../navigation'
+import ManagementPage from '../views/management/ManagementPage'
 
-const componentMap = {
-  Users: React.lazy(() => import("../views/base/users/Users")),
-  Nav: React.lazy(() => import("../views/base/nav/Nav")),
-  Roles: React.lazy(() => import("../views/base/roles/Roles")),
-  ListType: React.lazy(() => import("../views/base/lists/ListType")),
-  ListItems: React.lazy(() => import("../views/base/lists/ListItems")),
-  // Genders: React.lazy(() => import('../views/base/genders/Genders')),
-  Dashboard: React.lazy(() => import("../views/dashboard/Dashboard")),
-  RolePrivilege: React.lazy(() => import("../views/base/roles/RolePrivilege")),
-Profile: React.lazy(() => import("../views/base/users/Profile")),
-  Login: React.lazy(() => import("../views/pages/login/Login")), // Ensure Page404 is included in your lazy imports
+const Dashboard = React.lazy(() => import('../views/dashboard/Dashboard'))
+const Users = React.lazy(() => import('../views/base/users/Users'))
+const CatalogPage = React.lazy(() => import('../views/management/CatalogPage'))
+const Page404 = React.lazy(() => import('../views/pages/page404/Page404'))
 
-  Page404: React.lazy(() => import("../views/pages/page404/Page404")), // Ensure Page404 is included in your lazy imports
-};
-
-const AppContent = () => {
-  // const routes = MyRoutes();
-  const { sidebarData } = useSidebarSelector();
-
-  // useEffect(() => {
-  //   if (userData) {
-  //     showModal('TermsAndConditions', 'sms')
-  //   }
-  // }, [userData, showModal])
-
-  const routes = sidebarData?.filter((route) => route.name !== "Login");
-
-  return (
-    <CContainer className="px-4 app-content" fluid>
-      <Suspense fallback={<CSpinner color="primary" />}>
-        <HandleAlerts>
-          {/* <ShowAlerts notifications={notifications} /> */}
-          <Routes>
-            {routes?.map((route, idx) => {
-              const Component = componentMap[route.name] || Page404;
-              return (
-                route.name && (
-                  <Route
-                    key={idx}
-                    path={route.to}
-                    exact
-                    name={route.name}
-                    element={
-                      <Suspense fallback={<Preloader />}>
-                        <Component />
-                      </Suspense>
-                    }
+const AppContent = () => (
+  <CContainer className="app-content hm-content" fluid>
+    <Suspense
+      fallback={
+        <div className="hm-empty" role="status">
+          <CSpinner size="sm" />
+          <p>Loading your workspace…</p>
+        </div>
+      }
+    >
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        {navigation
+          .filter((route) => route.to)
+          .map((route) => (
+            <Route
+              key={route.id}
+              path={route.to}
+              element={
+                route.name === 'Dashboard' ? (
+                  <Dashboard />
+                ) : route.name === 'Users' ? (
+                  <Users />
+                ) : route.name === 'Categories' || route.name === 'SubCategories' ? (
+                  <CatalogPage
+                    key={route.id}
+                    kind={route.name === 'Categories' ? 'categories' : 'sub-categories'}
                   />
+                ) : (
+                  <ManagementPage key={route.id} name={route.name} />
                 )
-              );
-            })}
-            <Route path="*" name="Page 404" element={<Page404 />} />
-            {/* <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password/:token" element={<ResetPassword />} /> */}
-
-            {/* <Route path="/users-attendance" name="UsersAttendance" element={<UsersAttendance />} /> */}
-
-            {/* <Route path="/" element={<Navigate to="/404" replace />} /> */}
-          </Routes>
-        </HandleAlerts>
-      </Suspense>
-    </CContainer>
-  );
-};
-
-export default React.memo(AppContent);
+              }
+            />
+          ))}
+        <Route path="*" element={<Page404 />} />
+      </Routes>
+    </Suspense>
+  </CContainer>
+)
+export default React.memo(AppContent)

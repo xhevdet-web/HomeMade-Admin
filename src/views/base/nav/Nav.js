@@ -26,7 +26,7 @@ const Actions = () => {
   const fetchActions = async () => {
     try {
       const { data } = await axiosRequest("/nav/all", "get");
-      setActions(data);
+      setActions(data || []);
     } catch (error) {
       console.error("Error fetching actions:", error);
     }

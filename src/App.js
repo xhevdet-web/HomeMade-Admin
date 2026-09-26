@@ -1,63 +1,66 @@
 import React, { Suspense, useEffect } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useSelector } from 'react-redux'
-import { useColorModes } from '@coreui/react'
+import { CButton, CSpinner, useColorModes } from '@coreui/react'
+import { useAdminSession } from './hooks/useAdminSession'
+import useLogout from './_helpers/HandleLogOut'
 import './scss/style.scss'
-import { Preloader } from './components'
-// import "bootstrap/dist/css/bootstrap.min.css";
-// import "bootstrap/dist/js/bootstrap.bundle.min";
-import { useAuthSelector } from './redux/selectors/authSelectors'
 
-// Containers
 const DefaultLayout = React.lazy(() => import('./layout/DefaultLayout'))
-
-
-// Pages
 const Login = React.lazy(() => import('./views/pages/login/Login'))
-// const Register = React.lazy(() => import('./views/pages/register/Register'))
-const Page404 = React.lazy(() => import('./views/pages/page404/Page404'))
-const Page500 = React.lazy(() => import('./views/pages/page500/Page500'))
+
+const Loading = () => (
+  <div className="hm-session" role="status">
+    <CSpinner size="sm" aria-hidden="true" />
+    <span>Checking your session…</span>
+  </div>
+)
 
 const App = () => {
-  const { isColorModeSet, setColorMode } = useColorModes('sims-template-theme')
+  const { setColorMode } = useColorModes('sims-template-theme')
   const storedTheme = useSelector((state) => state.ui.theme)
+  const session = useAdminSession()
+  const { handleLogout } = useLogout()
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.href.split('?')[1])
-    const theme = urlParams.get('theme') && urlParams.get('theme').match(/^[A-Za-z0-9\s]+/)[0]
-    if (theme) {
-      setColorMode(theme)
-    }
-
-    if (isColorModeSet()) {
-      return
-    }
-
     setColorMode(storedTheme)
-  }, [])
+  }, [storedTheme, setColorMode])
 
-  const { isAuthenticated, userData } = useAuthSelector()
-
+  let content
+  if (session.token && session.status === 'error') {
+    content = (
+      <div className="hm-session">
+        <h1>We couldn’t verify your session</h1>
+        <p role="alert">{session.message}</p>
+        <div className="d-flex gap-2">
+          <CButton color="primary" onClick={session.retry}>
+            Try again
+          </CButton>
+          <CButton color="secondary" variant="outline" onClick={handleLogout}>
+            Back to sign in
+          </CButton>
+        </div>
+      </div>
+    )
+  } else if (session.token && !session.verified) {
+    content = <Loading />
+  } else {
+    content = (
+      <Routes>
+        <Route
+          path="/login"
+          element={session.verified ? <Navigate to="/dashboard" replace /> : <Login />}
+        />
+        <Route
+          path="*"
+          element={session.verified ? <DefaultLayout /> : <Navigate to="/login" replace />}
+        />
+      </Routes>
+    )
+  }
   return (
     <HashRouter>
-      <Suspense fallback={<Preloader />}>
-        <Routes>
-          {isAuthenticated !== true && userData === null ? (
-            <>
-              <Route exact path="/" name="Login Page" element={<Login />} />
-              {/* <Route exact path="/register" name="Register Page" element={<Register />} /> */}
-              <Route exact path="/404" name="Page 404" element={<Page404 />} />
-              <Route exact path="/500" name="Page 500" element={<Page500 />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </>
-          ) : userData.role_id !== 'b263c795-18e5-46ae-a5f0-22928d24e32d' ? (
-            <Route path="*" name="Home" element={<DefaultLayout />} />
-          ) : (
-            <Route path="*" name="Home" element={<AttendanceLayout />} />
-          )}
-        </Routes>
-      </Suspense>
+      <Suspense fallback={<Loading />}>{content}</Suspense>
     </HashRouter>
   )
 }
-
 export default App

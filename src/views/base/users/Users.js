@@ -1,158 +1,163 @@
-// src/views/.../Users.jsx
-import React, { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  CCol,
-  CRow,
-  CTable,
-  CTableBody,
-  CTableDataCell,
-  CTableHead,
-  CTableHeaderCell,
-  CTableRow,
+  CAlert,
+  CButton,
+  CCard,
   CFormInput,
-  CFormSwitch,        // <-- add this
+  CSpinner,
+  CTable,
+  CTableHead,
+  CTableBody,
+  CTableRow,
+  CTableHeaderCell,
+  CTableDataCell,
 } from '@coreui/react'
-import CIcon from '@coreui/icons-react'
-import { cilPeople } from '@coreui/icons'
-
-import { useModal } from '../../../_helpers/HandleModals'
-import useAxios from '../../../utils/useAxios'
-import { CustomButton } from '../../../components'
+import api, { apiErrorMessage } from '../../../_helpers/api'
+import EmptyState from '../../../components/EmptyState'
 
 const Users = () => {
-  const { showModal } = useModal()
   const [users, setUsers] = useState([])
-  const [meta, setMeta] = useState({ page: 1, limit: 20, total: 0 })
-  const [search, setSearch] = useState('')
-
-  const { axiosRequest, isLoading } = useAxios()
-
-  const fetchUsers = async (page = 1, query = '') => {
-    const { data } = await axiosRequest(`/users?page=${page}&limit=${meta.limit}&search=${encodeURIComponent(query)}`, 'get')
-    setUsers(data?.items || [])
-    setMeta({ page: data?.page || 1, limit: data?.limit || 20, total: data?.total || 0 })
-  }
-
+  const [query, setQuery] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [attempt, setAttempt] = useState(0)
   useEffect(() => {
-    fetchUsers(1, '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const onCreate = () =>
-    showModal('AddUser', {}, 'create', () => fetchUsers(meta.page, search))
-
-  const onEdit = (user) =>
-    showModal('AddUser', user, 'edit', () => fetchUsers(meta.page, search))
-
-  // NEW: toggle active
-  const onToggleActive = async (user, checked) => {
-    try {
-      await axiosRequest(`/users/${user.id}`, 'put', { is_active: checked })
-      // update UI quickly
-      setUsers((prev) =>
-        prev.map((u) => (u.id === user.id ? { ...u, is_active: checked } : u))
-      )
-    } catch (e) {
-      // if it fails, revert UI
-      setUsers((prev) =>
-        prev.map((u) => (u.id === user.id ? { ...u, is_active: user.is_active } : u))
-      )
-    }
-  }
+    const controller = new AbortController()
+    setLoading(true)
+    setError(null)
+    api
+      .get('/users', { signal: controller.signal })
+      .then(({ data }) => {
+        if (!Array.isArray(data)) throw new Error('Unexpected users response')
+        setUsers(data)
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setError(apiErrorMessage(error))
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false)
+      })
+    return () => controller.abort()
+  }, [attempt])
+  const filtered = useMemo(
+    () =>
+      users.filter((user) =>
+        `${user.firstName} ${user.lastName} ${user.email}`
+          .toLowerCase()
+          .includes(query.trim().toLowerCase()),
+      ),
+    [users, query],
+  )
 
   return (
     <>
-      <CRow className="mb-3">
-        <CCol sm={4}>
-          <h4 className="card-title mb-0">Users</h4>
-        </CCol>
-        <CCol sm={4}>
-          {/* <CFormInput
-            placeholder="Search by name or email…"
-            value={search}
-            onChange={(e) => {
-              const q = e.target.value
-              setSearch(q)
-              fetchUsers(1, q)
-            }}
-          /> */}
-        </CCol>
-        <CCol sm={4} className="text-end">
-          <CustomButton onClick={onCreate}>CREATE NEW</CustomButton>
-        </CCol>
-      </CRow>
-
-      <CTable align="middle" className="mb-0 border" hover responsive>
-        <CTableHead className="text-nowrap">
-          <CTableRow>
-            <CTableHeaderCell className="bg-body-tertiary text-center">
-              <CIcon icon={cilPeople} />
-            </CTableHeaderCell>
-            <CTableHeaderCell className="bg-body-tertiary">Name</CTableHeaderCell>
-            <CTableHeaderCell className="bg-body-tertiary">Email</CTableHeaderCell>
-            <CTableHeaderCell className="bg-body-tertiary">Role</CTableHeaderCell>
-            <CTableHeaderCell className="bg-body-tertiary">Active</CTableHeaderCell>
-            <CTableHeaderCell className="bg-body-tertiary">Actions</CTableHeaderCell>
-          </CTableRow>
-        </CTableHead>
-
-        <CTableBody>
-          {users.map((user, index) => (
-            <CTableRow key={user.id || index}>
-              <CTableDataCell className="text-center">
-                <CIcon icon={cilPeople} />
-              </CTableDataCell>
-              <CTableDataCell>{user.first_name} {user.last_name}</CTableDataCell>
-              <CTableDataCell>{user.email}</CTableDataCell>
-              <CTableDataCell>{user?.role?.name || '-'}</CTableDataCell>
-
-              {/* NEW: Active switch */}
-              <CTableDataCell>
-                <CFormSwitch
-                  size="lg"
-                  checked={!!user.is_active}
-                  onChange={(e) => onToggleActive(user, e.target.checked)}
-                  disabled={isLoading}
-                />
-              </CTableDataCell>
-
-              <CTableDataCell>
-                <div className="d-flex gap-2">
-                  <CustomButton actionType="edit" onClick={() => onEdit(user)}>
-                    Edit
-                  </CustomButton>
-                </div>
-              </CTableDataCell>
-            </CTableRow>
-          ))}
-        </CTableBody>
-      </CTable>
-
-      {meta.total > meta.limit && (
-        <div className="d-flex justify-content-between align-items-center mt-3">
-          <small>
-            Page {meta.page} of {Math.ceil(meta.total / meta.limit)} • {meta.total} total
-          </small>
-          <div className="d-flex gap-2">
-            <CustomButton
-              actionType="secondary"
-              disabled={meta.page <= 1}
-              onClick={() => fetchUsers(meta.page - 1, search)}
-            >
-              Prev
-            </CustomButton>
-            <CustomButton
-              actionType="secondary"
-              disabled={meta.page >= Math.ceil(meta.total / meta.limit)}
-              onClick={() => fetchUsers(meta.page + 1, search)}
-            >
-              Next
-            </CustomButton>
-          </div>
+      <div className="hm-page-heading">
+        <div>
+          <span className="hm-eyebrow">MANAGEMENT</span>
+          <h1>Users</h1>
+          <p>The people who make HomeMade a community.</p>
         </div>
-      )}
+        <CButton
+          color="primary"
+          variant="outline"
+          disabled={loading}
+          onClick={() => setAttempt((value) => value + 1)}
+        >
+          Refresh users
+        </CButton>
+      </div>
+      <CCard className="hm-panel">
+        <div className="hm-panel-heading">
+          <div>
+            <h2>User directory</h2>
+            <p>
+              {loading
+                ? 'Loading your community…'
+                : error
+                  ? 'Directory unavailable'
+                  : `${filtered.length} ${filtered.length === 1 ? 'user' : 'users'}`}
+            </p>
+          </div>
+          <CFormInput
+            className="hm-search"
+            type="search"
+            aria-label="Search users"
+            placeholder="Search name or email…"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
+        {loading ? (
+          <div className="hm-empty" role="status">
+            <CSpinner aria-hidden="true" />
+            <p>Loading users…</p>
+          </div>
+        ) : error ? (
+          <CAlert color="danger" className="m-4" role="alert">
+            {error}{' '}
+            <CButton color="link" onClick={() => setAttempt((value) => value + 1)}>
+              Try again
+            </CButton>
+          </CAlert>
+        ) : (
+          <CTable responsive className="hm-table mb-0">
+            <CTableHead>
+              <CTableRow>
+                {['Name', 'Email', 'Role', 'Status', 'Joined'].map((label) => (
+                  <CTableHeaderCell scope="col" key={label}>
+                    {label}
+                  </CTableHeaderCell>
+                ))}
+              </CTableRow>
+            </CTableHead>
+            <CTableBody>
+              {filtered.length ? (
+                filtered.map((user) => (
+                  <CTableRow key={user.id}>
+                    <CTableDataCell>
+                      <div className="hm-user-name">
+                        <span className="hm-avatar">
+                          {user.firstName?.[0]}
+                          {user.lastName?.[0]}
+                        </span>
+                        <strong>
+                          {user.firstName} {user.lastName}
+                        </strong>
+                      </div>
+                    </CTableDataCell>
+                    <CTableDataCell>{user.email}</CTableDataCell>
+                    <CTableDataCell>
+                      {user.role === 'ADMIN' ? 'Administrator' : 'Customer'}
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <span className={`hm-badge ${user.isActive ? 'hm-badge-active' : ''}`}>
+                        {user.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}
+                    </CTableDataCell>
+                  </CTableRow>
+                ))
+              ) : (
+                <CTableRow>
+                  <CTableDataCell colSpan={5}>
+                    <EmptyState
+                      title={query ? 'No matching users' : 'No users yet'}
+                      description={
+                        query
+                          ? 'Try a different name or email address.'
+                          : 'Registered users will appear here.'
+                      }
+                    />
+                  </CTableDataCell>
+                </CTableRow>
+              )}
+            </CTableBody>
+          </CTable>
+        )}
+      </CCard>
     </>
   )
 }
-
 export default Users

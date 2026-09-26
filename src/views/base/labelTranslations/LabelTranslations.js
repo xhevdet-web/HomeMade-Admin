@@ -24,7 +24,7 @@ const LabelTranslations = () => {
   const { sidebarData } = useSidebarSelector()
   const { userData } = useAuthSelector()
   const navItem = sidebarData?.find((el) => el.to === location.pathname)
-  const roleId = userData.role_id
+  const roleId = userData?.role_id
 
   const { axiosRequest } = useAxios()
 

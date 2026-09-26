@@ -1,24 +1,31 @@
-import { createStore, applyMiddleware, combineReducers } from 'redux';
-import { persistStore, persistReducer } from 'redux-persist';
-import storage from 'redux-persist/lib/storage';
-import autoMergeLevel2 from 'redux-persist/lib/stateReconciler/autoMergeLevel2';
-import authReducer from './reducers/authReducer';
-import authMiddleware from './middleware/authMiddleware';
-import uiReducer from './reducers/uiReducer';
-import { composeWithDevTools } from '@redux-devtools/extension';
-import sidebarReducer from './reducers/sidebarReducer';
-import loadingReducer from './reducers/loadingReducer';
+import { createStore, applyMiddleware, combineReducers } from 'redux'
+import { persistStore, persistReducer, createTransform } from 'redux-persist'
+import storage from 'redux-persist/lib/storage'
+import autoMergeLevel2 from 'redux-persist/lib/stateReconciler/autoMergeLevel2'
+import authReducer, { initialAuthState } from './reducers/authReducer'
+import authMiddleware from './middleware/authMiddleware'
+import uiReducer from './reducers/uiReducer'
+import { composeWithDevTools } from '@redux-devtools/extension'
+import sidebarReducer from './reducers/sidebarReducer'
+import loadingReducer from './reducers/loadingReducer'
 
 // Combine reducers
 const rootReducer = combineReducers({
   ui: uiReducer,
   auth: authReducer,
   sidebar: sidebarReducer,
-  loading: loadingReducer
+  loading: loadingReducer,
 })
 
 const persistConfig = {
   key: '#VORAE-2',
+  transforms: [
+    createTransform(
+      (auth) => ({ token: auth.token }),
+      (saved) => ({ ...initialAuthState, token: saved?.token || null }),
+      { whitelist: ['auth'] },
+    ),
+  ],
   storage: storage,
   stateReconciler: autoMergeLevel2,
 }

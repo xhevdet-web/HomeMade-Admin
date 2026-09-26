@@ -1,24 +1,28 @@
 // If you want to override variables do it here
-@import 'variables';
-@import 'react-datepicker/dist/react-datepicker.css';
+@use 'variables';
 
 // Import styles
-@import '@coreui/coreui/scss/coreui';
-@import '@coreui/chartjs/scss/coreui-chartjs';
+@use '@coreui/coreui/scss/coreui';
+@use '@coreui/chartjs/scss/coreui-chartjs';
 
 // Vendors
-@import 'vendors/simplebar';
+@use 'vendors/simplebar';
 
 // Custom styles for this theme
-@import 'theme';
+@use 'theme';
 
 // If you want to add custom CSS you can put it here
-@import 'custom';
+@use 'custom';
 
-@import './vendors/toasts.scss';
-@import './vendors/modals.scss';
-@import './vendors/preloades.scss';
-@import './vendors/pagination.scss';
-@import './vendors/multi-select.scss';
-@import './vendors/professor-multi-select.scss';
-@import './vendors/qrCodeScan.scss';
+@use './vendors/toasts.scss';
+@use './vendors/modals.scss';
+@use './vendors/preloades.scss';
+@use './vendors/pagination.scss';
+@use './vendors/multi-select.scss';
+@use './vendors/professor-multi-select.scss';
+@use './vendors/qrCodeScan.scss';
+
+@use 'homemade';
+
+// Plain CSS imports remain supported by Sass.
+@import 'react-datepicker/dist/react-datepicker.css';

@@ -1,32 +1,35 @@
 import * as types from '../actions/authActionTypes'
 
-// Initial state for user token
-const initialState = {
+export const initialAuthState = {
   token: null,
   user_data: null,
   is_authenticated: false,
+  status: 'idle',
+  message: null,
 }
 
-// Reducer function for authorization
-const authReducer = (state = initialState, action) => {
+const authReducer = (state = initialAuthState, action) => {
   switch (action.type) {
     case types.SET_USER_TOKEN:
-      return {
-        ...state,
-        is_authenticated: true,
-        token: action.payload,
-      }
+      return { ...initialAuthState, token: action.payload, status: 'checking' }
     case types.SET_USER_DATA:
+      if (action.payload?.role !== 'ADMIN') {
+        return {
+          ...initialAuthState,
+          message: 'Access denied. An administrator account is required.',
+        }
+      }
       return {
         ...state,
         user_data: action.payload,
+        is_authenticated: !!state.token,
+        status: 'ready',
+        message: null,
       }
+    case types.SET_AUTH_STATUS:
+      return { ...state, ...action.payload, is_authenticated: false, user_data: null }
     case types.CLEAR_USER_PERMISSIONS:
-      return {
-        user_data: null,
-        token: null,
-        is_authenticated: false,
-      }
+      return { ...initialAuthState, message: action.payload || null }
     default:
       return state
   }

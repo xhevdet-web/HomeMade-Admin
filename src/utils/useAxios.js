@@ -1,14 +1,11 @@
 import { useState } from 'react'
 import axios from './axiosInstance'
-import { useToast } from '../_helpers'
-import { clearUserPermissions } from '../redux/actions/authActionTypes'
-import { useDispatch } from 'react-redux'
+import { useToast } from '../_helpers/ToastProvider'
 
 const useAxios = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const { showToast } = useToast()
-  const dispatch = useDispatch()
 
   const axiosRequest = async (url, method, data = null, handleModalClose) => {
     setIsLoading(true)
@@ -44,7 +41,6 @@ const useAxios = () => {
           return res?.data
         })
         .catch((error) => {
-
           setIsLoading(false)
           showToast('async', 'hide')
           if (method !== 'get') {
@@ -52,33 +48,19 @@ const useAxios = () => {
               error?.response?.data?.status || 'Error',
               error?.response?.data?.message || 'Server error!',
             )
-          } else if (
-            error?.response?.data?.reason === 'JWTExpired' ||
-            error?.response?.data?.reason === 'NoActiveUsers'
-          ) {
-            console.log('JWT expired, dispatching clearUserPermissions')
-            try {
-              showToast('Error', error?.response?.data?.message);
-              dispatch(clearUserPermissions());
-              handleModalClose && handleModalClose();
-            } catch (error) {
-              console.error('Invalid close function!')
-            }
-
-            // Here you can also handle redirection to the login page if needed
-            // For example, using react-router's useHistory:
-            // const history = useHistory();
-            // history.push('/login');
           }
+          // The shared API interceptor handles session expiry and all 401s.
+          setError(error)
           return error
         })
     } catch (error) {
       showToast('async', 'hide')
       showToast(
         'Error',
-        'An error occurred during your request. Please contact the front administration!',error
+        'An error occurred during your request. Please contact the front administration!',
+        error,
       )
-      console.log("errorerror",error)
+      console.log('errorerror', error)
       setIsLoading(false)
       setError(error)
     }

@@ -24,7 +24,7 @@ import { CustomButton } from '../../../components'
 const RolePrivilege = () => {
   const { showToast } = useToast()
   const location = useLocation()
-  const { item, roles } = location?.state
+  const { item, roles } = location.state || {}
   const [actions, setActions] = useState([])
   const [editingId, setEditingId] = useState(null)
   const [tempRoleRights, setTempRoleRights] = useState({})
@@ -34,7 +34,7 @@ const RolePrivilege = () => {
 
   const navItem = sidebarData?.find((el) => el.to === location.pathname)
   const { userData } = useAuthSelector()
-  const roleId = userData.role_id
+  const roleId = userData?.role_id
   const { axiosRequest } = useAxios()
 
   const fetchActions = async () => {
@@ -45,7 +45,7 @@ const RolePrivilege = () => {
   }
 
   useEffect(() => {
-    fetchActions()
+    if (item) fetchActions()
   }, [])
 
   const getRoleRightsForNav = (navId) => {
@@ -111,6 +111,10 @@ const RolePrivilege = () => {
     setEditingId(null)
     setTempRoleRights({})
     showToast('Info', 'Modifikimi i rolit u anulua!')
+  }
+
+  if (!item) {
+    return <p>Select a role from the Roles page to view its privileges.</p>
   }
 
   return (

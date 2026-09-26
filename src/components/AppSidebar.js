@@ -1,78 +1,67 @@
-import React from 'react'
-import { useSelector, useDispatch } from 'react-redux'
-
+import { useDispatch, useSelector } from 'react-redux'
+import { NavLink } from 'react-router-dom'
 import {
+  CButton,
   CCloseButton,
   CSidebar,
   CSidebarBrand,
   CSidebarFooter,
   CSidebarHeader,
-  CSidebarToggler,
-  CImage,
 } from '@coreui/react'
-
+import CIcon from '@coreui/icons-react'
+import { cilAccountLogout } from '@coreui/icons'
 import { AppSidebarNav } from './AppSidebarNav'
-
-import avatar9 from './../assets/images/avatars/cacttus.png'
-import avatar8 from './../assets/images/avatars/wh_cac.png'
-
-
-// sidebar nav config
-// import navigation from '../_nav'
-import { setSidebarShow, setSidebarUnfoldable } from '../redux/actions/uiActions'
-import { useTheme } from '../redux/selectors/uiSelector'
+import { setSidebarShow } from '../redux/actions/uiActions'
 import { useSidebarSelector } from '../redux/selectors/sidebarSelector'
+import { useAuthSelector } from '../redux/selectors/authSelectors'
+import useLogout from '../_helpers/HandleLogOut'
 
 const AppSidebar = () => {
-  const selectedTheme = useTheme()
   const dispatch = useDispatch()
-
-  const { filteredSidebarData, currentView } = useSidebarSelector()
-
-  const unfoldable = useSelector((state) => state.ui.sidebarUnfoldable)
-  const sidebarShow = useSelector((state) => state.ui.sidebarShow)
-  const isSystemDarkMode =
-    window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-
-  let themeBasedLogo
-  if (selectedTheme === 'light') {
-    themeBasedLogo = avatar9
-  } else if (selectedTheme === 'auto') {
-    themeBasedLogo = isSystemDarkMode ? avatar8 : avatar9
-  } else {
-    themeBasedLogo = avatar8
-  }
-
+  const visible = useSelector((state) => state.ui.sidebarShow)
+  const { filteredSidebarData } = useSidebarSelector()
+  const { userData } = useAuthSelector()
+  const { handleLogout } = useLogout()
+  const initials = `${userData?.firstName?.[0] || ''}${userData?.lastName?.[0] || ''}` || 'A'
   return (
     <CSidebar
-      className="border-end"
-      colorScheme="light"
+      className="hm-sidebar"
       position="fixed"
-      unfoldable={unfoldable}
-      visible={sidebarShow}
-      onVisibleChange={(visible) => {
-        dispatch(setSidebarShow(visible))
-      }}
+      visible={visible}
+      onVisibleChange={(value) => dispatch(setSidebarShow(value))}
     >
-      <CSidebarHeader className="border-bottom">
-        <CSidebarBrand to="/">
-          <CImage
-            className="sidebar-brand-full w-100"
-            fluid
-            src={themeBasedLogo}
-            // width={200}
-            // height={32}
-          />
-          {/* <CIcon customClassName="sidebar-brand-narrow" icon={sygnet} height={32} /> */}
+      <CSidebarHeader>
+        <CSidebarBrand as={NavLink} to="/dashboard" className="hm-wordmark">
+          <span className="hm-monogram">h.</span>
+          <span>
+            HomeMade<small>ADMIN STUDIO</small>
+          </span>
         </CSidebarBrand>
-        <CCloseButton className="d-lg-none" dark onClick={() => dispatch(setSidebarShow(false))} />
+        <CCloseButton
+          className="d-lg-none"
+          white
+          aria-label="Close navigation"
+          onClick={() => dispatch(setSidebarShow(false))}
+        />
       </CSidebarHeader>
       <AppSidebarNav items={filteredSidebarData} />
-      <CSidebarFooter className="border-top d-none d-lg-flex">
-        <CSidebarToggler onClick={() => dispatch(setSidebarUnfoldable(!unfoldable))} />
+      <CSidebarFooter className="hm-sidebar-footer">
+        <div className="hm-admin">
+          <span className="hm-avatar">{initials}</span>
+          <div>
+            <strong>
+              {userData?.firstName} {userData?.lastName}
+            </strong>
+            <small title={userData?.email}>{userData?.email}</small>
+            <span className="hm-admin-role">Administrator</span>
+          </div>
+        </div>
+        <CButton className="hm-logout" onClick={handleLogout}>
+          <CIcon icon={cilAccountLogout} />
+          Sign out
+        </CButton>
       </CSidebarFooter>
     </CSidebar>
   )
 }
-
-export default React.memo(AppSidebar)
+export default AppSidebar

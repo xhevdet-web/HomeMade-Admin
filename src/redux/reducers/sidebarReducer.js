@@ -23,10 +23,6 @@ const sidebarReducer = (state = initialState, action) => {
         current_view: action.payload,
       }
 
-    case types.CLEAR:
-      return {
-        links: [],
-      }
 
     default:
       return state

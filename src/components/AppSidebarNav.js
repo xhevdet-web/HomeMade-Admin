@@ -8,6 +8,7 @@ import 'simplebar-react/dist/simplebar.min.css'
 
 import { CBadge, CNavLink, CSidebarNav, CNavItem, CNavTitle, CNavGroup } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
+import { setSidebarShow } from '../redux/actions/uiActions'
 import { setCurrentView } from '../redux/actions/sidebarActionTypes'
 import { useSidebarSelector } from '../redux/selectors/sidebarSelector'
 
@@ -79,6 +80,7 @@ export const AppSidebarNav = ({ items }) => {
   const { currentView } = useSidebarSelector()
 
   const handleClick = (e, id) => {
+    if (window.matchMedia('(max-width: 991px)').matches) dispatch(setSidebarShow(false))
     if (id) {
       dispatch(setCurrentView(id))
     }
@@ -122,7 +124,7 @@ export const AppSidebarNav = ({ items }) => {
   const navItem = (item, index, indent = false) => {
     // console.log('itemitemitem', item)
 
-    const { id, component, title, badge, icon_name, ...rest } = item
+    const { id, component, title, badge, icon_name, name, is_nav, ...rest } = item
 
     if (component) {
       const Component = componentMapping[component]

@@ -1,38 +1,28 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import { AppContent, AppSidebar, AppFooter, AppHeader } from '../components'
-import { useDispatch } from 'react-redux'
-import useAxios from '../utils/useAxios'
-import { setSidebarData } from '../redux/actions/sidebarActionTypes'
-import { useAuthSelector } from '../redux/selectors/authSelectors'
 import { useRouteSync } from '../hooks/useRouteSync'
 
 const DefaultLayout = () => {
-  const { axiosRequest } = useAxios()
-  const dispatch = useDispatch()
-  const { userData } = useAuthSelector()
-  
-  // Sync current view with route
   useRouteSync()
-  
-  const getNavData = async () => {
-    const { data } = await axiosRequest(`/nav/in-role/${userData.role_id}`, 'get',)
-    dispatch(setSidebarData(data))
-  }
-
-  useEffect(() => {
-    if (userData) { 
-      getNavData()
-    }
-  }, [userData])
 
   return (
-    <div>
+    <div className="hm-app">
+      <a
+        className="hm-skip-link"
+        href="#main-content"
+        onClick={(event) => {
+          event.preventDefault()
+          document.getElementById('main-content')?.focus()
+        }}
+      >
+        Skip to content
+      </a>
       <AppSidebar />
       <div className="wrapper d-flex flex-column min-vh-100">
         <AppHeader />
-        <div className="body flex-grow-1">
+        <main id="main-content" tabIndex={-1} className="body flex-grow-1">
           <AppContent />
-        </div>
+        </main>
         <AppFooter />
       </div>
     </div>

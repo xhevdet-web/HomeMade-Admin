@@ -1,8 +1,9 @@
 import { useSelector } from 'react-redux'
+import navigation from '../../navigation'
 
 // Custom hook to select sidebar state
 export const useSidebarSelector = () => {
-  const sidebarData = useSelector((state) => state?.sidebar?.links)
+  const sidebarData = navigation
   const currentView = useSelector((state) => state?.sidebar?.current_view)
   const filteredSidebarData = sidebarData?.filter((link) => link?.is_nav)
   return { sidebarData, filteredSidebarData, currentView }

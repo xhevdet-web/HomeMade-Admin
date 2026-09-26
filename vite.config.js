@@ -4,16 +4,16 @@ import path from 'node:path'
 import autoprefixer from 'autoprefixer'
 
 export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
   return {
     base: './',
     build: {
       outDir: 'build',
     },
     css: {
+      preprocessorOptions: { scss: { quietDeps: env.SASS_QUIET_DEPS === 'true' } },
       postcss: {
-        plugins: [
-          autoprefixer({}), 
-        ],
+        plugins: [autoprefixer({})],
       },
     },
     esbuild: {
@@ -40,7 +40,8 @@ export default defineConfig(({ mode }) => {
       extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json', '.scss'],
     },
     server: {
-      port: 3000,
+      port: 8081,
+      strictPort: true,
       proxy: {
         // https://vitejs.dev/config/server-options.html
       },
