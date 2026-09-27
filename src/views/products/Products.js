@@ -17,6 +17,7 @@ import { useAuthSelector } from '../../redux/selectors/authSelectors'
 import EmptyState from '../../components/EmptyState'
 import ProductDialog from './ProductDialog'
 import ProductImage from './ProductImage'
+import DesignPreview from './DesignPreview'
 import { creatorName, formatPrice, componentSummary } from './productHelpers'
 
 const Products = () => {
@@ -129,6 +130,7 @@ const Products = () => {
               <CTableRow>
                 {[
                   'Image',
+                  'Design',
                   'Name',
                   'Category',
                   'Components',
@@ -150,6 +152,9 @@ const Products = () => {
                   <CTableRow key={product.id}>
                     <CTableDataCell>
                       <ProductImage src={product.imageUrl} name={product.name} />
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <DesignPreview src={product.designPreviewUrl} name={product.name} />
                     </CTableDataCell>
                     <CTableDataCell>
                       <strong>{product.name}</strong>
@@ -207,7 +212,7 @@ const Products = () => {
                 ))
               ) : (
                 <CTableRow>
-                  <CTableDataCell colSpan={9}>
+                  <CTableDataCell colSpan={10}>
                     <EmptyState
                       title={query ? 'No matching products' : 'No products yet'}
                       description={

@@ -18,7 +18,6 @@ export const editableItems = (items = []) =>
 export const productPayload = (form) => ({
   name: form.name.trim(),
   description: form.description.trim() || null,
-  imageUrl: form.imageUrl.trim() || null,
   categoryId: form.categoryId,
   isActive: form.isActive,
   items: form.items.map((item) => {

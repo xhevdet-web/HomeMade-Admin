@@ -16,7 +16,6 @@ export const catalogConfig = {
 export const emptyCatalogForm = {
   name: '',
   description: '',
-  imageUrl: '',
   isActive: true,
   sortOrder: 0,
   categoryId: '',
@@ -31,7 +30,6 @@ export const catalogPayload = (form, isSubCategory) => {
   const payload = {
     name: form.name.trim(),
     description: nullable(form.description),
-    imageUrl: nullable(form.imageUrl),
     isActive: form.isActive,
     sortOrder: Number(form.sortOrder),
   }

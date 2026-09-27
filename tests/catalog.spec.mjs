@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { requestBody, pngFile } from './multipart.mjs'
 
 const categoryId = '11111111-1111-4111-8111-111111111111'
 const secondId = '22222222-2222-4222-8222-222222222222'
@@ -11,7 +12,12 @@ const baseCategory = {
   isActive: true,
   sortOrder: 2,
 }
-const secondCategory = { ...baseCategory, id: secondId, name: 'Bracelets', isActive: false }
+const secondCategory = {
+  ...baseCategory,
+  id: secondId,
+  name: 'Bracelets',
+  isActive: false,
+}
 const baseSub = {
   id: subId,
   categoryId,
@@ -60,7 +66,7 @@ async function setup(page, overrides = {}) {
     const request = route.request()
     const path = new URL(request.url()).pathname.replace('/api/v1', '')
     const method = request.method()
-    state.requests.push({ path, method, body: request.postDataJSON() })
+    state.requests.push({ path, method, body: await requestBody(request) })
     expect(request.headers().authorization).toBe(`Bearer ${token}`)
     if (path === '/auth/me')
       return fulfill(route, {
@@ -78,7 +84,11 @@ async function setup(page, overrides = {}) {
       resource === 'categories'
         ? {
             ...record,
-            ...(id ? { subCategories: state.subs.filter((sub) => sub.categoryId === id) } : {}),
+            ...(id
+              ? {
+                  subCategories: state.subs.filter((sub) => sub.categoryId === id),
+                }
+              : {}),
           }
         : {
             ...record,
@@ -99,9 +109,16 @@ async function setup(page, overrides = {}) {
     }
     if (method === 'POST' || method === 'PATCH') {
       if (state.failWrite) return fulfill(route, { message: ['Name is already in use'] }, 409)
-      const payload = request.postDataJSON()
+      const payload = await requestBody(request)
+      if (payload.file) {
+        payload.imageUrl = 'https://example.com/uploaded.png'
+        delete payload.file
+      }
       if (method === 'POST')
-        state[collection].push({ id: '44444444-4444-4444-8444-444444444444', ...payload })
+        state[collection].push({
+          id: '44444444-4444-4444-8444-444444444444',
+          ...payload,
+        })
       else
         state[collection] = state[collection].map((record) =>
           record.id === id ? { ...record, ...payload } : record,
@@ -137,7 +154,7 @@ test('Category create, detail, edit and confirmed delete use exact API contracts
   await page.getByRole('button', { name: 'Create Category', exact: true }).click()
   await dialog(page).getByLabel('Name', { exact: true }).fill('Rings')
   await dialog(page).getByLabel('Description', { exact: true }).fill('Handmade rings')
-  await dialog(page).getByLabel('Image URL').fill('https://example.com/rings.jpg')
+  await dialog(page).getByLabel('Image (optional)').setInputFiles(pngFile)
   await dialog(page).getByLabel('Sort order').fill('4')
   await dialog(page).getByLabel('Active', { exact: true }).uncheck()
   await dialog(page).getByRole('button', { name: 'Save Category', exact: true }).click()
@@ -145,7 +162,11 @@ test('Category create, detail, edit and confirmed delete use exact API contracts
   expect(state.requests.find((r) => r.method === 'POST').body).toEqual({
     name: 'Rings',
     description: 'Handmade rings',
-    imageUrl: 'https://example.com/rings.jpg',
+    file: {
+      name: pngFile.name,
+      type: pngFile.mimeType,
+      size: pngFile.buffer.length,
+    },
     isActive: false,
     sortOrder: 4,
   })
@@ -158,13 +179,11 @@ test('Category create, detail, edit and confirmed delete use exact API contracts
   await expect(dialog(page).getByLabel('Name', { exact: true })).toHaveValue('Rings')
   await dialog(page).getByLabel('Name', { exact: true }).fill('Gold rings')
   await dialog(page).getByLabel('Description', { exact: true }).fill('')
-  await dialog(page).getByLabel('Image URL').fill('')
   await dialog(page).getByRole('button', { name: 'Save Category', exact: true }).click()
   await expect(page.getByRole('cell', { name: 'Gold rings', exact: true })).toBeVisible()
   expect(state.requests.find((r) => r.method === 'PATCH').body).toMatchObject({
     name: 'Gold rings',
-    description: null,
-    imageUrl: null,
+    description: '',
   })
   await page.getByRole('button', { name: 'Delete Gold rings', exact: true }).click()
   await expect(dialog(page)).toContainText('permanently deletes all of its subcategories')
@@ -200,7 +219,7 @@ test('SubCategory dropdown displays category names, submits IDs, and supports fu
   await select.selectOption(categoryId)
   await dialog(page).getByLabel('Name', { exact: true }).fill('Silver charm')
   await dialog(page).getByLabel('Description', { exact: true }).fill('Small charm')
-  await dialog(page).getByLabel('Image URL').fill('https://example.com/charm.jpg')
+  await dialog(page).getByLabel('Image (optional)').setInputFiles(pngFile)
   await dialog(page).getByLabel('Color', { exact: true }).fill('Silver')
   await dialog(page).getByLabel('Type', { exact: true }).fill('Charm')
   await dialog(page).getByLabel('Price (cents)', { exact: true }).fill('1250')
@@ -212,7 +231,11 @@ test('SubCategory dropdown displays category names, submits IDs, and supports fu
     categoryId,
     name: 'Silver charm',
     description: 'Small charm',
-    imageUrl: 'https://example.com/charm.jpg',
+    file: {
+      name: pngFile.name,
+      type: pngFile.mimeType,
+      size: pngFile.buffer.length,
+    },
     color: 'Silver',
     type: 'Charm',
     price: 1250,
@@ -329,6 +352,77 @@ test('mobile catalog and form fit the viewport and search shows an empty state',
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
     .toBe(true)
-  await page.screenshot({ path: 'test-results/subcategory-mobile.png', fullPage: true })
+  await page.screenshot({
+    path: 'test-results/subcategory-mobile.png',
+    fullPage: true,
+  })
   await dialog(page).getByRole('button', { name: 'Cancel' }).click()
+})
+
+for (const [path, label, name] of [
+  ['categories', 'Category', 'Necklaces'],
+  ['sub-categories', 'SubCategory', 'Pearl pendant'],
+]) {
+  test(`${label} validates images, retains failed uploads, and preserves unchanged images`, async ({
+    page,
+  }) => {
+    const state = await setup(page)
+    await page.route('https://example.com/**', (route) =>
+      route.fulfill({ contentType: 'image/png', body: pngFile.buffer }),
+    )
+    await page.goto(`/#/${path}`)
+    await page.getByRole('button', { name: `Edit ${name}`, exact: true }).click()
+    const picker = dialog(page).getByLabel('Image (optional)')
+    const preview = dialog(page).getByRole('img')
+    await expect(preview).toHaveAttribute(
+      'src',
+      path === 'categories' ? baseCategory.imageUrl : /catalog-placeholder|^data:image\/svg\+xml/,
+    )
+    await picker.setInputFiles({
+      name: 'bad.gif',
+      mimeType: 'image/gif',
+      buffer: Buffer.from('bad'),
+    })
+    await expect(dialog(page).getByRole('alert')).toContainText('JPEG, PNG, or WebP')
+    await picker.setInputFiles({
+      ...pngFile,
+      buffer: Buffer.alloc(5 * 1024 * 1024 + 1),
+    })
+    await expect(dialog(page).getByRole('alert')).toContainText('5 MB')
+    await picker.setInputFiles(pngFile)
+    await expect(preview).toHaveAttribute('src', /^blob:/)
+    state.failWrite = true
+    await dialog(page)
+      .getByRole('button', { name: `Save ${label}`, exact: true })
+      .click()
+    await expect(dialog(page).getByRole('alert')).toContainText('Name is already in use')
+    await expect(preview).toHaveAttribute('src', /^blob:/)
+    expect(await picker.evaluate((input) => input.files[0]?.name)).toBe('bead.png')
+    state.failWrite = false
+    await dialog(page)
+      .getByRole('button', { name: `Save ${label}`, exact: true })
+      .click()
+    await expect(dialog(page)).toHaveCount(0)
+    expect(state.requests.filter((r) => r.method === 'PATCH').at(-1).body.file.name).toBe(
+      'bead.png',
+    )
+    await page.getByRole('button', { name: `Edit ${name}`, exact: true }).click()
+    await dialog(page)
+      .getByRole('button', { name: `Save ${label}`, exact: true })
+      .click()
+    await expect(dialog(page)).toHaveCount(0)
+    expect(state.requests.filter((r) => r.method === 'PATCH').at(-1).body).not.toHaveProperty(
+      'file',
+    )
+  })
+}
+
+test('broken category image uses the bundled placeholder', async ({ page }) => {
+  await setup(page)
+  await page.route('https://example.com/**', (route) => route.abort())
+  await page.goto('/#/categories')
+  await expect(page.getByRole('img', { name: 'Necklaces preview' })).toHaveAttribute(
+    'src',
+    /catalog-placeholder|^data:image\/svg\+xml/,
+  )
 })

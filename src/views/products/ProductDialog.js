@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import {
   CAlert,
@@ -19,8 +19,11 @@ import {
   CSpinner,
 } from '@coreui/react'
 import api, { apiErrorMessage } from '../../_helpers/api'
+import ImagePicker from '../../components/ImagePicker'
+import { imageFormData } from '../../_helpers/imageUpload'
 import { useAuthSelector } from '../../redux/selectors/authSelectors'
 import ProductImage from './ProductImage'
+import DesignPreview from './DesignPreview'
 import ComponentEditor from './ComponentEditor'
 import ComponentTable from './ComponentTable'
 import { creatorName, formatPrice, productPayload, editableItems } from './productHelpers'
@@ -50,6 +53,8 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
     loading: false,
     error: null,
   })
+  const [selectedFile, setSelectedFile] = useState(null)
+  const submitting = useRef(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
@@ -60,7 +65,9 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
     Promise.all([
       action.mode === 'create'
         ? Promise.resolve(null)
-        : api.get(`/products/${encodeURIComponent(action.id)}`, { signal: controller.signal }),
+        : api.get(`/products/${encodeURIComponent(action.id)}`, {
+            signal: controller.signal,
+          }),
       editing ? api.get('/categories', { signal: controller.signal }) : Promise.resolve(null),
     ])
       .then(([detail, options]) => {
@@ -141,7 +148,7 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
   }
   const submit = async (event) => {
     event.preventDefault()
-    if (saving) return
+    if (submitting.current) return
     setError(null)
     if (!isAdmin) {
       setError('Only administrators can manage products.')
@@ -178,11 +185,17 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
         return
       }
     }
+    submitting.current = true
     setSaving(true)
     try {
       if (action.mode === 'delete') await api.delete(`/products/${encodeURIComponent(action.id)}`)
-      else if (action.mode === 'create') await api.post('/products', payload)
-      else await api.patch(`/products/${encodeURIComponent(action.id)}`, payload)
+      else if (action.mode === 'create')
+        await api.post('/products', imageFormData(payload, selectedFile))
+      else
+        await api.patch(
+          `/products/${encodeURIComponent(action.id)}`,
+          imageFormData(payload, selectedFile),
+        )
       onSaved(
         `Product ${action.mode === 'delete' ? 'deleted' : action.mode === 'create' ? 'created' : 'updated'} successfully.`,
       )
@@ -194,6 +207,7 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
             : ''),
       )
     } finally {
+      submitting.current = false
       setSaving(false)
     }
   }
@@ -265,6 +279,11 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
               )}
               {action.mode === 'view' ? (
                 <>
+                  <section className="hm-order-section">
+                    <h3>Customer design</h3>
+                    <DesignPreview src={record?.designPreviewUrl} name={record?.name} large />
+                  </section>
+                  <h3>Catalog image</h3>
                   <ProductImage src={record?.imageUrl} name={record?.name} large />
                   <dl className="hm-catalog-details">
                     {fields.map(([label, value]) => (
@@ -347,16 +366,15 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
                           </CAlert>
                         </CCol>
                       )}
-                    {input('imageUrl', 'Image URL', {
-                      type: 'url',
-                      pattern: 'https?://.+',
-                      placeholder: 'https://example.com/product.jpg',
-                    })}
-                    {form.imageUrl && (
-                      <CCol xs={12}>
-                        <ProductImage src={form.imageUrl} name={form.name} large />
-                      </CCol>
-                    )}
+                    <CCol xs={12}>
+                      <ImagePicker
+                        id="entity-image"
+                        file={selectedFile}
+                        onChange={setSelectedFile}
+                        imageUrl={record?.imageUrl}
+                        name={form.name}
+                      />
+                    </CCol>
                     <CCol xs={12}>
                       <CFormCheck
                         id="product-isActive"

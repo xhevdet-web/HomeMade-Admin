@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import {
   CAlert,
@@ -20,6 +20,9 @@ import {
 } from '@coreui/react'
 import { Link } from 'react-router-dom'
 import api, { apiErrorMessage } from '../../_helpers/api'
+import ProductImage from '../products/ProductImage'
+import ImagePicker from '../../components/ImagePicker'
+import { imageFormData } from '../../_helpers/imageUpload'
 import { catalogConfig, catalogPayload, emptyCatalogForm } from './catalogFields'
 
 const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
@@ -32,6 +35,8 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
   const [error, setError] = useState(null)
+  const [selectedFile, setSelectedFile] = useState(null)
+  const submitting = useRef(false)
   const [saving, setSaving] = useState(false)
   const [attempt, setAttempt] = useState(0)
 
@@ -42,7 +47,9 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
     const detail =
       action.mode === 'create'
         ? Promise.resolve(null)
-        : api.get(`${endpoint}/${encodeURIComponent(action.id)}`, { signal: controller.signal })
+        : api.get(`${endpoint}/${encodeURIComponent(action.id)}`, {
+            signal: controller.signal,
+          })
     const options =
       isSubCategory && editing
         ? api.get('/categories', { signal: controller.signal })
@@ -78,11 +85,14 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
 
   const change = (event) => {
     const { name, value, type, checked } = event.target
-    setForm((previous) => ({ ...previous, [name]: type === 'checkbox' ? checked : value }))
+    setForm((previous) => ({
+      ...previous,
+      [name]: type === 'checkbox' ? checked : value,
+    }))
   }
   const submit = async (event) => {
     event.preventDefault()
-    if (saving) return
+    if (submitting.current) return
     setError(null)
     if (editing && !form.name.trim()) {
       setError('Name is required.')
@@ -96,11 +106,12 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
       setError('Select an available category.')
       return
     }
+    submitting.current = true
     setSaving(true)
     try {
       if (action.mode === 'delete') await api.delete(`${endpoint}/${encodeURIComponent(action.id)}`)
       else {
-        const payload = catalogPayload(form, isSubCategory)
+        const payload = imageFormData(catalogPayload(form, isSubCategory), selectedFile)
         if (action.mode === 'create') await api.post(endpoint, payload)
         else await api.patch(`${endpoint}/${encodeURIComponent(action.id)}`, payload)
       }
@@ -110,6 +121,7 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
     } catch (error) {
       setError(apiErrorMessage(error))
     } finally {
+      submitting.current = false
       setSaving(false)
     }
   }
@@ -125,7 +137,13 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
       />
     </CCol>
   )
-  const integer = { type: 'number', min: 0, max: 2147483647, step: 1, required: true }
+  const integer = {
+    type: 'number',
+    min: 0,
+    max: 2147483647,
+    step: 1,
+    required: true,
+  }
   const title = `${action.mode === 'view' ? '' : action.mode === 'create' ? 'Create ' : action.mode === 'edit' ? 'Edit ' : 'Delete '}${singular}${action.mode === 'view' ? ' details' : ''}`
   const fields = [
     ['Name', record?.name],
@@ -182,18 +200,21 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                 </CAlert>
               )}
               {action.mode === 'view' ? (
-                <dl className="hm-catalog-details">
-                  {fields.map(([label, value]) => (
-                    <div key={label}>
-                      <dt>{label}</dt>
-                      <dd>
-                        {value === null || value === undefined || value === ''
-                          ? 'Not provided'
-                          : String(value)}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
+                <>
+                  <ProductImage src={record?.imageUrl} name={record?.name} large />
+                  <dl className="hm-catalog-details">
+                    {fields.map(([label, value]) => (
+                      <div key={label}>
+                        <dt>{label}</dt>
+                        <dd>
+                          {value === null || value === undefined || value === ''
+                            ? 'Not provided'
+                            : String(value)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </>
               ) : action.mode === 'delete' ? (
                 <>
                   <p>
@@ -259,11 +280,15 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                         onChange={change}
                       />
                     </CCol>
-                    {input('imageUrl', 'Image URL', {
-                      type: 'url',
-                      pattern: 'https?://.+',
-                      placeholder: 'https://example.com/image.jpg',
-                    })}
+                    <CCol xs={12}>
+                      <ImagePicker
+                        id="entity-image"
+                        file={selectedFile}
+                        onChange={setSelectedFile}
+                        imageUrl={record?.imageUrl}
+                        name={form.name}
+                      />
+                    </CCol>
                     {isSubCategory && (
                       <>
                         {input('color', 'Color')}
@@ -329,7 +354,10 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
 }
 CatalogDialog.propTypes = {
   kind: PropTypes.oneOf(['categories', 'sub-categories']).isRequired,
-  action: PropTypes.shape({ mode: PropTypes.string.isRequired, id: PropTypes.string }).isRequired,
+  action: PropTypes.shape({
+    mode: PropTypes.string.isRequired,
+    id: PropTypes.string,
+  }).isRequired,
   onClose: PropTypes.func.isRequired,
   onSaved: PropTypes.func.isRequired,
 }

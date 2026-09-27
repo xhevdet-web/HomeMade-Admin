@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { requestBody, pngFile } from './multipart.mjs'
 
 const cat1 = '11111111-1111-4111-8111-111111111111'
 const cat2 = '22222222-2222-4222-8222-222222222222'
@@ -49,6 +50,7 @@ const product = {
   name: 'Pearl necklace',
   description: 'Handmade pearl necklace',
   imageUrl: 'https://images.example.test/pearl.png',
+  designPreviewUrl: 'https://images.example.test/design.png',
   categoryId: cat1,
   items: [{ subCategoryId: sub1, quantity: 20, position: 0, unitPrice: 75 }],
   itemCount: 20,
@@ -103,7 +105,7 @@ async function setup(page, overrides = {}) {
     state.requests.push({
       path,
       method,
-      body: request.postDataJSON(),
+      body: await requestBody(request),
       authorization: request.headers().authorization,
     })
     expect(request.headers().authorization).toBe(`Bearer ${token}`)
@@ -149,7 +151,7 @@ async function setup(page, overrides = {}) {
           },
           state.writeStatus,
         )
-      const body = request.postDataJSON()
+      const body = await requestBody(request)
       for (const field of ['price', 'unitPrice', 'itemCount', 'createdById', 'subCategoryId'])
         expect(body?.[field]).toBeUndefined()
       if (body?.items) {
@@ -177,7 +179,11 @@ async function setup(page, overrides = {}) {
       expect(body?.createdById).toBeUndefined()
       expect(body?.createdBy).toBeUndefined()
       if (method === 'POST') {
-        const created = { id: '66666666-6666-4666-8666-666666666666', ...body, ...totals(body) }
+        const created = {
+          id: '66666666-6666-4666-8666-666666666666',
+          ...body,
+          ...totals(body),
+        }
         state.products.push(created)
         return fulfill(route, decorate(created), 201)
       }
@@ -231,8 +237,7 @@ test('multiple component CRUD sends complete arrays and displays server totals a
   await expect(dialog(page)).toHaveCount(0)
   expect(state.requests.find((r) => r.method === 'POST').body).toEqual({
     name: 'Gold bracelet',
-    description: null,
-    imageUrl: null,
+    description: '',
     categoryId: cat2,
     isActive: true,
     items: [
@@ -276,7 +281,12 @@ test('category resets all rows, ignores late responses and only offers active ma
   await page.route(`**/api/v1/categories/${cat2}/sub-categories`, (route) =>
     fulfill(route, [
       ...subs[cat2],
-      { ...subs[cat2][0], id: 'inactive', name: 'Inactive bead', isActive: false },
+      {
+        ...subs[cat2][0],
+        id: 'inactive',
+        name: 'Inactive bead',
+        isActive: false,
+      },
       { ...subs[cat1][0], name: 'Wrong category' },
     ]),
   )
@@ -415,4 +425,75 @@ test('late category response cannot replace the new component options', async ({
   await expect(dialog(page).locator('summary')).toContainText('Beads')
   await dialog(page).locator('summary').click()
   await expect(dialog(page).getByRole('button', { name: /Pendants/ })).toHaveCount(0)
+})
+
+test('product image upload keeps items and supports metadata-only replacement', async ({
+  page,
+}) => {
+  const state = await setup(page)
+  await page.goto('/#/products')
+  await fillNew(page)
+  await dialog(page).getByLabel('Image (optional)').setInputFiles(pngFile)
+  await expect(dialog(page).getByRole('img', { name: 'Gold bracelet preview' })).toHaveAttribute(
+    'src',
+    /^blob:/,
+  )
+  await dialog(page).getByRole('button', { name: 'Save Product', exact: true }).click()
+  await expect(dialog(page)).toHaveCount(0)
+  const created = state.requests.find((r) => r.method === 'POST').body
+  expect(created.file.name).toBe('bead.png')
+  expect(created.items).toEqual([{ subCategoryId: sub2, quantity: 8 }])
+  await page.getByRole('button', { name: 'Edit Gold bracelet', exact: true }).click()
+  await dialog(page).getByLabel('Image (optional)').setInputFiles(pngFile)
+  await dialog(page).getByRole('button', { name: 'Save Product', exact: true }).click()
+  await expect(dialog(page)).toHaveCount(0)
+  const changed = state.requests.filter((r) => r.method === 'PATCH').at(-1).body
+  expect(changed.file.name).toBe('bead.png')
+  expect(changed).not.toHaveProperty('items')
+  await page.getByRole('button', { name: 'Edit Gold bracelet', exact: true }).click()
+  await dialog(page).getByRole('button', { name: 'Save Product', exact: true }).click()
+  await expect(dialog(page)).toHaveCount(0)
+  expect(state.requests.filter((r) => r.method === 'PATCH').at(-1).body).not.toHaveProperty('file')
+})
+
+test('product design is separate from catalog image, contains the whole preview and falls back for null or broken URLs', async ({
+  page,
+}) => {
+  const state = await setup(page)
+  await page.goto('/#/products')
+  const row = page.getByRole('row').filter({ hasText: 'Pearl necklace' })
+  await expect(row.locator('.hm-design-preview img')).toHaveAttribute(
+    'src',
+    product.designPreviewUrl,
+  )
+  await expect(row.locator('.hm-product-image img')).toHaveAttribute('src', product.imageUrl)
+  await page.getByRole('button', { name: 'View Pearl necklace' }).click()
+  await expect(dialog(page).getByRole('heading', { name: 'Customer design' })).toBeVisible()
+  const preview = dialog(page).locator('.hm-design-preview-large img')
+  await expect(preview).toHaveCSS('object-fit', 'contain')
+  await expect(
+    dialog(page).getByRole('link', { name: 'Open full-size customer design' }),
+  ).toHaveAttribute('href', product.designPreviewUrl)
+  await dialog(page).getByRole('button', { name: 'Close', exact: true }).last().click()
+  await expect(dialog(page)).toHaveCount(0)
+  for (const url of [null, 'https://images.example.test/broken.png']) {
+    state.products[0].designPreviewUrl = url
+    await page.route('https://images.example.test/broken.png', (route) => route.abort())
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+    await expect(row.locator('.hm-design-preview img')).toHaveAttribute(
+      'src',
+      /(?:catalog-placeholder|^data:image\/svg\+xml)/,
+    )
+    await page.getByRole('button', { name: 'View Pearl necklace' }).click()
+    await expect(dialog(page).locator('.hm-design-preview-large img')).toHaveAttribute(
+      'src',
+      /(?:catalog-placeholder|^data:image\/svg\+xml)/,
+    )
+    await expect(dialog(page)).toContainText('Design preview unavailable')
+    await expect(
+      dialog(page).getByRole('link', { name: 'Open full-size customer design' }),
+    ).toHaveCount(0)
+    await dialog(page).getByRole('button', { name: 'Close', exact: true }).last().click()
+    await expect(dialog(page)).toHaveCount(0)
+  }
 })

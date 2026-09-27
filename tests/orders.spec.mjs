@@ -26,6 +26,7 @@ const product = {
   name: 'Pearl necklace',
   description: 'A handmade freshwater pearl necklace.',
   imageUrl: 'https://images.example.test/pearl.png',
+  designPreviewUrl: 'https://images.example.test/design.png',
   itemCount: 24,
   price: 4999,
   category: {
@@ -619,4 +620,80 @@ test('pending placement disables submission and refreshes subcategories without 
   expect(state.requests.some((r) => r.path.includes('sub-categories') && r.method !== 'GET')).toBe(
     false,
   )
+})
+
+test('order design is prominent with saved materials and historical total through the workflow and payment updates', async ({
+  page,
+}) => {
+  const state = await setup(page, { orders: [makeOrder(0)] })
+  await page.goto('/#/orders')
+  await expect(page.getByRole('columnheader', { name: 'Design', exact: true })).toBeVisible()
+  await expect(page.locator('.hm-orders-table .hm-design-preview img')).toHaveAttribute(
+    'src',
+    product.designPreviewUrl,
+  )
+  await openFirst(page)
+  const design = dialog(page).locator('.hm-customer-design')
+  await expect(design.locator('.hm-design-preview-large img')).toHaveAttribute(
+    'src',
+    product.designPreviewUrl,
+  )
+  await expect(design.locator('.hm-design-preview-large img')).toHaveCSS('object-fit', 'contain')
+  const component = design.getByRole('row').filter({ hasText: 'Pearls' })
+  await expect(component).toContainText('24')
+  await expect(component).toContainText('\u20ac1.00')
+  await expect(component).toContainText('\u20ac24.00')
+  await expect(component.getByRole('img')).toHaveCSS('object-fit', 'contain')
+  await expect(design.locator('.hm-design-total')).toContainText('\u20ac29.99')
+  expect(state.requests.some((r) => r.path.startsWith('/products'))).toBe(false)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+    .toBe(true)
+  await design.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: 'test-results/customer-design-mobile.png' })
+  await page.setViewportSize({ width: 1440, height: 1080 })
+  await design.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: 'test-results/customer-design-desktop.png' })
+  for (const status of [
+    'CREATING',
+    'CREATED',
+    'READY_FOR_COURIER',
+    'PICKED_UP_BY_COURIER',
+    'COMPLETED',
+  ]) {
+    await dialog(page).getByRole('button', { name: 'Move to next status' }).click()
+    await expect.poll(() => state.orders[0].status).toBe(status)
+    await expect(design.locator('.hm-design-preview-large img')).toHaveAttribute(
+      'src',
+      product.designPreviewUrl,
+    )
+  }
+  await dialog(page).getByLabel('Payment status', { exact: true }).selectOption('PAID')
+  await dialog(page).getByRole('button', { name: 'Update payment status' }).click()
+  await expect(dialog(page).getByRole('status')).toContainText('Payment status updated')
+  await expect(design.locator('.hm-design-preview-large img')).toHaveAttribute(
+    'src',
+    product.designPreviewUrl,
+  )
+})
+
+test('order design fallback uses bundled image and never falls back to the catalog image', async ({
+  page,
+}) => {
+  const order = { ...makeOrder(0), product: { ...product, designPreviewUrl: null } }
+  await setup(page, { orders: [order] })
+  await page.goto('/#/orders')
+  await expect(page.locator('.hm-orders-table .hm-design-preview img')).toHaveAttribute(
+    'src',
+    /(?:catalog-placeholder|^data:image\/svg\+xml)/,
+  )
+  await openFirst(page)
+  await expect(dialog(page).locator('.hm-design-preview-large img')).toHaveAttribute(
+    'src',
+    /(?:catalog-placeholder|^data:image\/svg\+xml)/,
+  )
+  await expect(
+    dialog(page).locator('.hm-order-product-summary .hm-product-image').first().getByRole('img'),
+  ).toHaveAttribute('src', product.imageUrl)
 })

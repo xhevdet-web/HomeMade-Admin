@@ -16,6 +16,7 @@ import {
 import api, { apiErrorMessage } from '../../_helpers/api'
 import EmptyState from '../../components/EmptyState'
 import CatalogDialog from './CatalogDialog'
+import ProductImage from '../products/ProductImage'
 import { catalogConfig } from './catalogFields'
 
 const CatalogPage = ({ kind }) => {
@@ -57,6 +58,7 @@ const CatalogPage = ({ kind }) => {
     [records, query],
   )
   const columns = [
+    'Image',
     'Name',
     ...(isSubCategory ? ['Category', 'Color', 'Price (cents)', 'Stock'] : []),
     'Status',
@@ -142,6 +144,9 @@ const CatalogPage = ({ kind }) => {
               {filtered.length ? (
                 filtered.map((record) => (
                   <CTableRow key={record.id}>
+                    <CTableDataCell>
+                      <ProductImage src={record.imageUrl} name={record.name} />
+                    </CTableDataCell>
                     <CTableDataCell>
                       <strong>{record.name}</strong>
                     </CTableDataCell>
@@ -244,5 +249,7 @@ const CatalogPage = ({ kind }) => {
     </>
   )
 }
-CatalogPage.propTypes = { kind: PropTypes.oneOf(['categories', 'sub-categories']).isRequired }
+CatalogPage.propTypes = {
+  kind: PropTypes.oneOf(['categories', 'sub-categories']).isRequired,
+}
 export default CatalogPage

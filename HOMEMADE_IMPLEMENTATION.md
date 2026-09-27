@@ -1,5 +1,7 @@
 # HomeMade Admin implementation report
 
+Dashboard update: The dashboard now displays live user/product/order totals, completed/unpaid/paid counts, workflow/payment breakdowns and recent orders. See [Dashboard statistics](DASHBOARD_STATS.md). Earlier dashboard placeholder notes below are superseded.
+
 Users update: Users now supports admin-only CRUD, and the backend enforces JWT/ADMIN on Users endpoints. See [Users management](USERS_MANAGEMENT.md). Earlier read-only and unguarded-Users notes below describe the original shell and are superseded.
 
 Orders update: Orders now includes filtering, pagination, details, notes/image editing, workflow/payment updates, confirmed deletion and creation. See [Orders management](ORDER_MANAGEMENT.md). Earlier Orders placeholder and missing-backend references below describe the initial shell and are superseded by this update.

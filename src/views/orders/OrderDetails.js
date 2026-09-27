@@ -17,6 +17,7 @@ import {
 import api, { apiErrorMessage } from '../../_helpers/api'
 import { useAuthSelector } from '../../redux/selectors/authSelectors'
 import ProductImage from '../products/ProductImage'
+import DesignPreview from '../products/DesignPreview'
 import ComponentTable from '../products/ComponentTable'
 import { formatPrice } from '../products/productHelpers'
 import OrderBadge from './OrderBadge'
@@ -232,12 +233,126 @@ const OrderDetails = ({ id, initialDelete = false, onClose, onChanged, onDeleted
                 <div>
                   <OrderBadge value={order.status} />
                   <p>{orderDate(order.createdAt, true)}</p>
+                  <p>{personName(order.user)}</p>
                 </div>
                 <div>
                   <span>Order total</span>
                   <strong>{formatPrice(order.totalPrice)}</strong>
                   <small>Price at the time of ordering</small>
                 </div>
+              </div>
+              <section className="hm-order-section hm-customer-design">
+                <span className="hm-eyebrow">CUSTOMER DESIGN</span>
+                <h3>{product?.name || 'Jewelry design'}</h3>
+                <DesignPreview src={product?.designPreviewUrl} name={product?.name} large />
+                <h4>Components / materials</h4>
+                <ComponentTable items={product?.items} />
+                <div className="hm-design-total">
+                  <span>Order total</span>
+                  <strong>{formatPrice(order.totalPrice)}</strong>
+                </div>
+              </section>
+              <section className="hm-order-section">
+                <h3>Product</h3>
+                <div className="hm-order-product-summary">
+                  <ProductImage src={product?.imageUrl} name={product?.name} large />
+                  <div>
+                    <h4>{product?.name || 'Unavailable product'}</h4>
+                    <p className="hm-order-text">
+                      {product?.description || 'No description provided.'}
+                    </p>
+                    <span>{product?.itemCount ?? 0} items</span>
+                  </div>
+                </div>
+                <div className="hm-order-two-columns">
+                  <div>
+                    <h4>Category</h4>
+                    <div className="hm-order-product-summary">
+                      <ProductImage
+                        src={product?.category?.imageUrl}
+                        name={product?.category?.name}
+                      />
+                      <div>
+                        <strong>{product?.category?.name || 'Unavailable'}</strong>
+                        <p>{product?.category?.description || 'No description provided.'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+              <section className="hm-order-section">
+                <h3>Customer notes</h3>
+                <p className="hm-order-text">{order.customerNotes || 'No customer notes.'}</p>
+              </section>
+              <section className="hm-order-section">
+                <div className="hm-order-section-heading">
+                  <h3>Payment</h3>
+                  <OrderBadge value={order.paymentStatus} payment />
+                </div>
+                <p>{paymentTypes[order.paymentType]}</p>
+                <CForm
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    mutate('payment', { paymentStatus: payment })
+                  }}
+                >
+                  <div className="hm-order-payment-controls">
+                    <div>
+                      <CFormLabel htmlFor="order-payment-status">Payment status</CFormLabel>
+                      <CFormSelect
+                        id="order-payment-status"
+                        value={payment}
+                        onChange={(event) => setPayment(event.target.value)}
+                        disabled={!!busy || !isAdmin}
+                      >
+                        {Object.entries(paymentLabels).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </CFormSelect>
+                    </div>
+                    <CButton
+                      type="submit"
+                      color="primary"
+                      variant="outline"
+                      disabled={!!busy || !isAdmin || payment === order.paymentStatus}
+                    >
+                      {busy === 'payment' ? 'Saving...' : 'Update payment status'}
+                    </CButton>
+                  </div>
+                </CForm>
+                <p className="hm-order-section-caption mt-2">
+                  This records payment status only; it does not charge a card or issue a refund.
+                </p>
+              </section>
+              <div className="hm-order-two-columns">
+                <section className="hm-order-section">
+                  <h3>Delivery snapshot</h3>
+                  <p className="hm-order-section-caption">
+                    Saved when the order was placed. Read-only.
+                  </p>
+                  <Facts
+                    entries={[
+                      ['Name', personName(order)],
+                      ['Phone', order.phone],
+                      ['Country', order.country],
+                      ['Address', order.address],
+                      ['Postal code', order.postalCode],
+                    ]}
+                  />
+                </section>
+                <section className="hm-order-section">
+                  <h3>Customer now</h3>
+                  <p className="hm-order-section-caption">Current contact information.</p>
+                  <Facts
+                    entries={[
+                      ['Name', personName(order.user)],
+                      ['Email', order.user?.email],
+                      ['Phone', order.user?.phone],
+                    ]}
+                  />
+                </section>
               </div>
               <section className="hm-order-section">
                 <div className="hm-order-section-heading">
@@ -294,112 +409,6 @@ const OrderDetails = ({ id, initialDelete = false, onClose, onChanged, onDeleted
                     Reload latest order
                   </CButton>
                 )}
-              </section>
-              <div className="hm-order-two-columns">
-                <section className="hm-order-section">
-                  <h3>Delivery snapshot</h3>
-                  <p className="hm-order-section-caption">
-                    Saved when the order was placed. Read-only.
-                  </p>
-                  <Facts
-                    entries={[
-                      ['Name', personName(order)],
-                      ['Phone', order.phone],
-                      ['Country', order.country],
-                      ['Address', order.address],
-                      ['Postal code', order.postalCode],
-                    ]}
-                  />
-                </section>
-                <section className="hm-order-section">
-                  <h3>Customer now</h3>
-                  <p className="hm-order-section-caption">Current contact information.</p>
-                  <Facts
-                    entries={[
-                      ['Name', personName(order.user)],
-                      ['Email', order.user?.email],
-                      ['Phone', order.user?.phone],
-                    ]}
-                  />
-                </section>
-              </div>
-              <section className="hm-order-section">
-                <h3>Product</h3>
-                <div className="hm-order-product-summary">
-                  <ProductImage src={product?.imageUrl} name={product?.name} large />
-                  <div>
-                    <h4>{product?.name || 'Unavailable product'}</h4>
-                    <p className="hm-order-text">
-                      {product?.description || 'No description provided.'}
-                    </p>
-                    <span>{product?.itemCount ?? 0} items</span>
-                  </div>
-                </div>
-                <div className="hm-order-two-columns">
-                  <div>
-                    <h4>Category</h4>
-                    <div className="hm-order-product-summary">
-                      <ProductImage
-                        src={product?.category?.imageUrl}
-                        name={product?.category?.name}
-                      />
-                      <div>
-                        <strong>{product?.category?.name || 'Unavailable'}</strong>
-                        <p>{product?.category?.description || 'No description provided.'}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-              <section className="hm-order-section">
-                <h3>Components</h3>
-                <ComponentTable items={product?.items} />
-              </section>
-              <section className="hm-order-section">
-                <h3>Customer notes</h3>
-                <p className="hm-order-text">{order.customerNotes || 'No customer notes.'}</p>
-              </section>
-              <section className="hm-order-section">
-                <div className="hm-order-section-heading">
-                  <h3>Payment</h3>
-                  <OrderBadge value={order.paymentStatus} payment />
-                </div>
-                <p>{paymentTypes[order.paymentType]}</p>
-                <CForm
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    mutate('payment', { paymentStatus: payment })
-                  }}
-                >
-                  <div className="hm-order-payment-controls">
-                    <div>
-                      <CFormLabel htmlFor="order-payment-status">Payment status</CFormLabel>
-                      <CFormSelect
-                        id="order-payment-status"
-                        value={payment}
-                        onChange={(event) => setPayment(event.target.value)}
-                        disabled={!!busy || !isAdmin}
-                      >
-                        {Object.entries(paymentLabels).map(([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        ))}
-                      </CFormSelect>
-                    </div>
-                    <CButton
-                      type="submit"
-                      color="primary"
-                      variant="outline"
-                      disabled={!!busy || !isAdmin || payment === order.paymentStatus}
-                    >
-                      {busy === 'payment' ? 'Saving...' : 'Update payment status'}
-                    </CButton>
-                  </div>
-                </CForm>
-                <p className="hm-order-section-caption mt-2">
-                  This records payment status only; it does not charge a card or issue a refund.
-                </p>
               </section>
               <section className="hm-order-section">
                 <h3>Studio notes &amp; finished piece</h3>

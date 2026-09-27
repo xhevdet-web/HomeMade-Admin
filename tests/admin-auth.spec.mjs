@@ -234,7 +234,13 @@ test('dashboard and placeholders request no invented endpoints, unknown route is
   }
   await page.goto('/#/missing')
   await expect(page.getByRole('heading', { name: 'This page couldn’t be found' })).toBeVisible()
-  expect(requests.every((url) => url.endsWith('/auth/me'))).toBe(true)
+  expect(
+    requests.every((url) =>
+      ['/api/v1/auth/me', '/api/v1/users', '/api/v1/products', '/api/v1/orders'].includes(
+        new URL(url).pathname,
+      ),
+    ),
+  ).toBe(true)
   expect(errors).toEqual([])
 })
 
@@ -262,4 +268,12 @@ test('mobile login and dashboard fit the viewport with working navigation', asyn
   await page.getByRole('link', { name: 'Products', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Products', exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Products', exact: true })).not.toBeInViewport()
+})
+
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/orders?*', (route) =>
+    fulfill(route, { data: [], meta: { page: 1, limit: 5, total: 0, totalPages: 0 } }),
+  )
+  await page.route('**/api/v1/products', (route) => fulfill(route, []))
+  await page.route('**/api/v1/users', (route) => fulfill(route, []))
 })

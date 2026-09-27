@@ -18,7 +18,7 @@ import {
 import api, { apiErrorMessage } from '../../_helpers/api'
 import { useAuthSelector } from '../../redux/selectors/authSelectors'
 import EmptyState from '../../components/EmptyState'
-import ProductImage from '../products/ProductImage'
+import DesignPreview from '../products/DesignPreview'
 import { formatPrice } from '../products/productHelpers'
 import OrderBadge from './OrderBadge'
 import OrderDetails from './OrderDetails'
@@ -252,6 +252,7 @@ const Orders = () => {
                   'Order number',
                   'Customer',
                   'Product',
+                  'Design',
                   'Total',
                   'Payment type',
                   'Payment status',
@@ -278,11 +279,12 @@ const Orders = () => {
                       </button>
                     </CTableDataCell>
                     <CTableDataCell>{personName(order.user)}</CTableDataCell>
+                    <CTableDataCell>{order.product?.name || 'Unavailable product'}</CTableDataCell>
                     <CTableDataCell>
-                      <div className="hm-order-table-product">
-                        <ProductImage src={order.product?.imageUrl} name={order.product?.name} />
-                        <span>{order.product?.name || 'Unavailable product'}</span>
-                      </div>
+                      <DesignPreview
+                        src={order.product?.designPreviewUrl}
+                        name={order.product?.name}
+                      />
                     </CTableDataCell>
                     <CTableDataCell className="text-nowrap">
                       {formatPrice(order.totalPrice)}
@@ -327,7 +329,7 @@ const Orders = () => {
                 ))
               ) : (
                 <CTableRow>
-                  <CTableDataCell colSpan={9}>
+                  <CTableDataCell colSpan={10}>
                     <EmptyState
                       title={
                         activeFilters ? 'No orders match your filters' : 'Your order book is ready'
