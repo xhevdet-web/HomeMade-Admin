@@ -58,7 +58,7 @@ const CatalogPage = ({ kind }) => {
   )
   const columns = [
     'Name',
-    ...(isSubCategory ? ['Category', 'Price (cents)', 'Stock'] : []),
+    ...(isSubCategory ? ['Category', 'Color', 'Price (cents)', 'Stock'] : []),
     'Status',
     'Sort order',
     'Actions',
@@ -149,6 +149,24 @@ const CatalogPage = ({ kind }) => {
                       <>
                         <CTableDataCell>
                           {record.category?.name || 'Unavailable category'}
+                        </CTableDataCell>
+                        <CTableDataCell>
+                          <span className="d-inline-flex align-items-center gap-2">
+                            {record.color && CSS.supports('color', record.color) && (
+                              <span
+                                aria-hidden="true"
+                                style={{
+                                  backgroundColor: record.color,
+                                  width: 18,
+                                  height: 18,
+                                  borderRadius: '50%',
+                                  border: '1px solid var(--hm-line)',
+                                  flexShrink: 0,
+                                }}
+                              />
+                            )}
+                            {record.color || 'Not specified'}
+                          </span>
                         </CTableDataCell>
                         <CTableDataCell>{record.price}</CTableDataCell>
                         <CTableDataCell>{record.stock}</CTableDataCell>

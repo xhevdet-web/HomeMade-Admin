@@ -204,10 +204,10 @@ test('users uses the array contract, filters, and handles a protected API 401', 
         ])
   })
   await page.goto('/#/users')
-  await expect(page.getByRole('cell', { name: admin.email })).toBeVisible()
+  await expect(page.getByRole('cell', { name: admin.email, exact: true })).toBeVisible()
   await page.getByRole('searchbox', { name: 'Search users' }).fill('Jordan')
-  await expect(page.getByRole('cell', { name: admin.email })).toHaveCount(0)
-  await expect(page.getByRole('cell', { name: 'customer@example.test' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: admin.email, exact: true })).toHaveCount(0)
+  await expect(page.getByRole('cell', { name: 'customer@example.test', exact: true })).toBeVisible()
   fail = true
   await page.getByRole('button', { name: 'Refresh users' }).click()
   await expectLoggedOut(page)
@@ -228,7 +228,7 @@ test('dashboard and placeholders request no invented endpoints, unknown route is
   await page.goto('/#/dashboard')
   await expect(page.getByRole('heading', { name: 'Welcome back, Alex' })).toBeVisible()
   await page.screenshot({ path: 'test-results/homemade-dashboard.png', fullPage: true })
-  for (const name of ['Products', 'Components', 'Designs', 'Orders']) {
+  for (const name of ['Components', 'Designs']) {
     await page.getByRole('link', { name, exact: true }).click()
     await expect(page.getByRole('heading', { name: `${name} will live here` })).toBeVisible()
   }

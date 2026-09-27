@@ -1,5 +1,11 @@
 # HomeMade Admin implementation report
 
+Users update: Users now supports admin-only CRUD, and the backend enforces JWT/ADMIN on Users endpoints. See [Users management](USERS_MANAGEMENT.md). Earlier read-only and unguarded-Users notes below describe the original shell and are superseded.
+
+Orders update: Orders now includes filtering, pagination, details, notes/image editing, workflow/payment updates, confirmed deletion and creation. See [Orders management](ORDER_MANAGEMENT.md). Earlier Orders placeholder and missing-backend references below describe the initial shell and are superseded by this update.
+
+Products update: Products now has a complete management page. See [Products management](PRODUCT_MANAGEMENT.md). Earlier references below to Products being a placeholder describe the initial shell and are superseded by this update.
+
 Category management update: Categories and SubCategories now have full list, detail, create, edit and confirmed delete screens. See [Category management](CATEGORY_MANAGEMENT.md) for the current API integration. References below to Categories being a placeholder describe the initial dashboard shell and are superseded by that update.
 
 ## 1. Existing architecture discovered

@@ -13,9 +13,15 @@ import {
   CTableDataCell,
 } from '@coreui/react'
 import api, { apiErrorMessage } from '../../../_helpers/api'
+import UserDialog from './UserDialog'
+import { useAuthSelector } from '../../../redux/selectors/authSelectors'
 import EmptyState from '../../../components/EmptyState'
 
 const Users = () => {
+  const { userData } = useAuthSelector()
+  const isAdmin = userData?.role === 'ADMIN'
+  const [action, setAction] = useState(null)
+  const [notice, setNotice] = useState(null)
   const [users, setUsers] = useState([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
@@ -29,7 +35,7 @@ const Users = () => {
       .get('/users', { signal: controller.signal })
       .then(({ data }) => {
         if (!Array.isArray(data)) throw new Error('Unexpected users response')
-        setUsers(data)
+        if (!controller.signal.aborted) setUsers(data)
       })
       .catch((error) => {
         if (!controller.signal.aborted) setError(apiErrorMessage(error))
@@ -57,15 +63,27 @@ const Users = () => {
           <h1>Users</h1>
           <p>The people who make HomeMade a community.</p>
         </div>
-        <CButton
-          color="primary"
-          variant="outline"
-          disabled={loading}
-          onClick={() => setAttempt((value) => value + 1)}
-        >
-          Refresh users
-        </CButton>
+        <div className="d-flex gap-2">
+          {isAdmin && (
+            <CButton color="primary" onClick={() => setAction({ mode: 'create' })}>
+              Add User
+            </CButton>
+          )}
+          <CButton
+            color="primary"
+            variant="outline"
+            disabled={loading}
+            onClick={() => setAttempt((value) => value + 1)}
+          >
+            Refresh users
+          </CButton>
+        </div>
       </div>
+      {notice && (
+        <CAlert color="success" role="status">
+          {notice}
+        </CAlert>
+      )}
       <CCard className="hm-panel">
         <div className="hm-panel-heading">
           <div>
@@ -103,11 +121,13 @@ const Users = () => {
           <CTable responsive className="hm-table mb-0">
             <CTableHead>
               <CTableRow>
-                {['Name', 'Email', 'Role', 'Status', 'Joined'].map((label) => (
-                  <CTableHeaderCell scope="col" key={label}>
-                    {label}
-                  </CTableHeaderCell>
-                ))}
+                {['Name', 'Email', 'Role', 'Status', 'Joined', ...(isAdmin ? ['Actions'] : [])].map(
+                  (label) => (
+                    <CTableHeaderCell scope="col" key={label}>
+                      {label}
+                    </CTableHeaderCell>
+                  ),
+                )}
               </CTableRow>
             </CTableHead>
             <CTableBody>
@@ -137,11 +157,35 @@ const Users = () => {
                     <CTableDataCell>
                       {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}
                     </CTableDataCell>
+                    {isAdmin && (
+                      <CTableDataCell>
+                        <div className="hm-catalog-actions">
+                          <CButton
+                            size="sm"
+                            color="primary"
+                            variant="outline"
+                            aria-label={`Edit ${user.email}`}
+                            onClick={() => setAction({ mode: 'edit', id: user.id })}
+                          >
+                            Edit
+                          </CButton>
+                          <CButton
+                            size="sm"
+                            color="danger"
+                            variant="outline"
+                            aria-label={`Delete ${user.email}`}
+                            onClick={() => setAction({ mode: 'delete', id: user.id })}
+                          >
+                            Delete
+                          </CButton>
+                        </div>
+                      </CTableDataCell>
+                    )}
                   </CTableRow>
                 ))
               ) : (
                 <CTableRow>
-                  <CTableDataCell colSpan={5}>
+                  <CTableDataCell colSpan={isAdmin ? 6 : 5}>
                     <EmptyState
                       title={query ? 'No matching users' : 'No users yet'}
                       description={
@@ -157,6 +201,18 @@ const Users = () => {
           </CTable>
         )}
       </CCard>
+      {action && isAdmin && (
+        <UserDialog
+          key={`${action.mode}-${action.id || 'new'}`}
+          action={action}
+          onClose={() => setAction(null)}
+          onSaved={(message) => {
+            setAction(null)
+            setNotice(message)
+            setAttempt((value) => value + 1)
+          }}
+        />
+      )}
     </>
   )
 }

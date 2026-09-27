@@ -7,6 +7,8 @@ import ManagementPage from '../views/management/ManagementPage'
 const Dashboard = React.lazy(() => import('../views/dashboard/Dashboard'))
 const Users = React.lazy(() => import('../views/base/users/Users'))
 const CatalogPage = React.lazy(() => import('../views/management/CatalogPage'))
+const Products = React.lazy(() => import('../views/products/Products'))
+const Orders = React.lazy(() => import('../views/orders/Orders'))
 const Page404 = React.lazy(() => import('../views/pages/page404/Page404'))
 
 const AppContent = () => (
@@ -32,6 +34,10 @@ const AppContent = () => (
                   <Dashboard />
                 ) : route.name === 'Users' ? (
                   <Users />
+                ) : route.name === 'Orders' ? (
+                  <Orders />
+                ) : route.name === 'Products' ? (
+                  <Products />
                 ) : route.name === 'Categories' || route.name === 'SubCategories' ? (
                   <CatalogPage
                     key={route.id}
