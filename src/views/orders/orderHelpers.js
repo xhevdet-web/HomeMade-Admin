@@ -40,3 +40,20 @@ export const nextStatus = (status) => {
   const index = workflow.indexOf(status)
   return index < 0 ? null : workflow[index + 1] || null
 }
+
+// Snapshot fields preserve the design that was purchased, even if the catalog changes.
+export const orderedProduct = (order) => {
+  const snapshot = order?.designSnapshot
+  // Backend snapshots are versioned envelopes, not the product itself.
+  if (snapshot?.version === 1 && snapshot.product && typeof snapshot.product === 'object')
+    return snapshot.product
+  return order?.product
+}
+export const orderProductLabel = (order) =>
+  orderedProduct(order)?.productType === 'READY_MADE' ? 'Ready-made product' : 'Custom design'
+export const orderDesignImage = (order) => {
+  const product = orderedProduct(order)
+  return product?.productType === 'READY_MADE'
+    ? product.imageUrl
+    : order?.designPreviewUrl ?? product?.designPreviewUrl
+}

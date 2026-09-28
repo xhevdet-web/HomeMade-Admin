@@ -29,6 +29,9 @@ import {
   personName,
   statusLabels,
   workflow,
+  orderedProduct,
+  orderDesignImage,
+  orderProductLabel,
 } from './orderHelpers'
 
 const Facts = ({ entries }) => (
@@ -148,7 +151,8 @@ const OrderDetails = ({ id, initialDelete = false, onClose, onChanged, onDeleted
     }
   }
   const next = nextStatus(order?.status)
-  const product = order?.product
+  const product = orderedProduct(order)
+  const readyMade = product?.productType === 'READY_MADE'
   return (
     <CModal
       visible
@@ -242,42 +246,47 @@ const OrderDetails = ({ id, initialDelete = false, onClose, onChanged, onDeleted
                 </div>
               </div>
               <section className="hm-order-section hm-customer-design">
-                <span className="hm-eyebrow">CUSTOMER DESIGN</span>
+                <span className="hm-eyebrow">
+                  {readyMade ? 'READY-MADE PRODUCT' : 'CUSTOMER DESIGN'}
+                </span>
                 <h3>{product?.name || 'Jewelry design'}</h3>
-                <DesignPreview src={product?.designPreviewUrl} name={product?.name} large />
-                <h4>Components / materials</h4>
-                <ComponentTable items={product?.items} />
+                <p className="hm-order-text">
+                  {product?.description || 'No description provided.'}
+                </p>
+                <DesignPreview
+                  src={orderDesignImage(order)}
+                  name={product?.name}
+                  readyMade={readyMade}
+                  large
+                />
+                <Facts
+                  entries={[
+                    ['Product type', orderProductLabel(order)],
+                    ['Category', product?.category?.name],
+                    [
+                      'Purchased size',
+                      product?.selectedSize
+                        ? `${product.selectedSize.name} · ${product.selectedSize.measurement} ${product.selectedSize.unit}`
+                        : 'Size not recorded',
+                    ],
+                    [
+                      readyMade ? 'Quantity' : 'Bead count',
+                      readyMade ? '1 finished product' : `${product?.itemCount ?? 0} items`,
+                    ],
+                  ]}
+                />
+                {product?.category?.description && (
+                  <p className="hm-muted">{product.category.description}</p>
+                )}
+                {(!readyMade || product?.items?.length > 0) && (
+                  <>
+                    <h4>{readyMade ? 'Included materials' : 'Components / materials'}</h4>
+                    <ComponentTable items={product?.items} />
+                  </>
+                )}
                 <div className="hm-design-total">
                   <span>Order total</span>
                   <strong>{formatPrice(order.totalPrice)}</strong>
-                </div>
-              </section>
-              <section className="hm-order-section">
-                <h3>Product</h3>
-                <div className="hm-order-product-summary">
-                  <ProductImage src={product?.imageUrl} name={product?.name} large />
-                  <div>
-                    <h4>{product?.name || 'Unavailable product'}</h4>
-                    <p className="hm-order-text">
-                      {product?.description || 'No description provided.'}
-                    </p>
-                    <span>{product?.itemCount ?? 0} items</span>
-                  </div>
-                </div>
-                <div className="hm-order-two-columns">
-                  <div>
-                    <h4>Category</h4>
-                    <div className="hm-order-product-summary">
-                      <ProductImage
-                        src={product?.category?.imageUrl}
-                        name={product?.category?.name}
-                      />
-                      <div>
-                        <strong>{product?.category?.name || 'Unavailable'}</strong>
-                        <p>{product?.category?.description || 'No description provided.'}</p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </section>
               <section className="hm-order-section">

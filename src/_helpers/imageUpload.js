@@ -12,7 +12,10 @@ export const imageFormData = (fields, file) => {
   const data = new FormData()
   Object.entries(fields).forEach(([key, value]) => {
     if (value !== undefined)
-      data.append(key, key === 'items' ? JSON.stringify(value) : String(value ?? ''))
+      data.append(
+        key,
+        ['items', 'sizes'].includes(key) ? JSON.stringify(value) : String(value ?? ''),
+      )
   })
   if (file) data.append('file', file)
   return data

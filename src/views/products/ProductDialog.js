@@ -29,6 +29,9 @@ import ComponentTable from './ComponentTable'
 import { creatorName, formatPrice, productPayload, editableItems } from './productHelpers'
 
 const initialForm = {
+  productType: 'READY_MADE',
+  price: '',
+  stock: '',
   name: '',
   description: '',
   imageUrl: '',
@@ -57,6 +60,7 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
   const submitting = useRef(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const readyMade = form.productType === 'READY_MADE'
 
   useEffect(() => {
     const controller = new AbortController()
@@ -81,6 +85,9 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
         setForm(
           data
             ? {
+                productType: data.productType ?? 'CUSTOM_DESIGN',
+                price: (data.price / 100).toFixed(2),
+                stock: String(data.stock ?? 0),
                 name: data.name,
                 description: data.description ?? '',
                 imageUrl: data.imageUrl ?? '',
@@ -102,7 +109,7 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
   }, [action.id, action.mode, editing, attempt])
 
   useEffect(() => {
-    if (!editing || loading || loadError || !form.categoryId) return
+    if (!editing || readyMade || loading || loadError || !form.categoryId) return
     const categoryId = form.categoryId
     const controller = new AbortController()
     setSubState({ categoryId, items: [], loading: true, error: null })
@@ -130,7 +137,7 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
           })
       })
     return () => controller.abort()
-  }, [form.categoryId, editing, loading, loadError, subAttempt])
+  }, [form.categoryId, editing, readyMade, loading, loadError, subAttempt])
 
   const subReady =
     !!form.categoryId &&
@@ -143,7 +150,7 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
     setForm((previous) => ({
       ...previous,
       [name]: type === 'checkbox' ? checked : value,
-      ...(name === 'categoryId' ? { items: [] } : {}),
+      ...(name === 'categoryId' || name === 'productType' ? { items: [] } : {}),
     }))
   }
   const submit = async (event) => {
@@ -165,6 +172,7 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
         form.categoryId !== record?.categoryId ||
         JSON.stringify(editableItems(record?.items)) !== JSON.stringify(form.items)
       if (
+        !readyMade &&
         componentsChanged &&
         (!categories.some((category) => category.id === form.categoryId) ||
           !subReady ||
@@ -174,12 +182,21 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
         setError('Select an available category and active components for every row.')
         return
       }
+      if (readyMade && !categories.some((category) => category.id === form.categoryId)) {
+        setError('Select an available category.')
+        return
+      }
+      if (readyMade && action.mode === 'create' && !selectedFile) {
+        setError('Choose an image for the ready-made product.')
+        return
+      }
       try {
         payload = productPayload(form)
         if (action.mode === 'edit' && !componentsChanged) {
           delete payload.items
           delete payload.categoryId
         }
+        if (action.mode === 'edit') delete payload.productType
       } catch (error) {
         setError(error.message)
         return
@@ -188,16 +205,25 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
     submitting.current = true
     setSaving(true)
     try {
+      let saved
       if (action.mode === 'delete') await api.delete(`/products/${encodeURIComponent(action.id)}`)
       else if (action.mode === 'create')
-        await api.post('/products', imageFormData(payload, selectedFile))
+        saved = await api.post('/products', imageFormData(payload, selectedFile), {
+          timeout: selectedFile ? 120000 : 15000,
+        })
       else
-        await api.patch(
+        saved = await api.patch(
           `/products/${encodeURIComponent(action.id)}`,
           imageFormData(payload, selectedFile),
+          { timeout: selectedFile ? 120000 : 15000 },
         )
+      if (saved) {
+        setRecord(saved.data)
+        setSelectedFile(null)
+      }
       onSaved(
         `Product ${action.mode === 'delete' ? 'deleted' : action.mode === 'create' ? 'created' : 'updated'} successfully.`,
+        saved?.data,
       )
     } catch (error) {
       setError(
@@ -234,9 +260,11 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
         ['Name', record.name],
         ['Description', record.description || 'Not provided'],
         ['Category', record.category?.name || 'Unavailable category'],
+        ['Product type', record.productType === 'READY_MADE' ? 'Ready-made' : 'Custom design'],
         ['Creator', creatorName(record.createdBy)],
         ['Item count', record.itemCount],
         ['Price', formatPrice(record.price)],
+        ...(record.productType === 'READY_MADE' ? [['Available stock', record.stock]] : []),
         ['Status', record.isActive ? 'Active' : 'Inactive'],
       ]
     : []
@@ -279,12 +307,14 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
               )}
               {action.mode === 'view' ? (
                 <>
-                  <section className="hm-order-section">
-                    <h3>Customer design</h3>
-                    <DesignPreview src={record?.designPreviewUrl} name={record?.name} large />
-                  </section>
+                  {record?.productType !== 'READY_MADE' && (
+                    <section className="hm-order-section">
+                      <h3>Customer design</h3>
+                      <DesignPreview src={record?.designPreviewUrl} name={record?.name} large />
+                    </section>
+                  )}
                   <h3>Catalog image</h3>
-                  <ProductImage src={record?.imageUrl} name={record?.name} large />
+                  <ProductImage src={record?.imageUrl} name={record?.name} transparent large />
                   <dl className="hm-catalog-details">
                     {fields.map(([label, value]) => (
                       <div key={label}>
@@ -293,7 +323,7 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
                       </div>
                     ))}
                   </dl>
-                  <ComponentTable items={record?.items} />
+                  {record?.items?.length > 0 && <ComponentTable items={record.items} />}
                 </>
               ) : action.mode === 'delete' ? (
                 <>
@@ -305,17 +335,20 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
               ) : (
                 <fieldset disabled={saving || !isAdmin}>
                   <CRow className="g-3">
-                    {input('name', 'Name', { required: true, maxLength: 200 })}
-                    <CCol xs={12}>
-                      <CFormLabel htmlFor="product-description">Description</CFormLabel>
-                      <CFormTextarea
-                        id="product-description"
-                        name="description"
-                        rows={3}
-                        value={form.description}
-                        onChange={change}
-                      />
-                    </CCol>
+                    {action.mode === 'create' && (
+                      <CCol xs={12}>
+                        <CFormLabel htmlFor="product-productType">Product type</CFormLabel>
+                        <CFormSelect
+                          id="product-productType"
+                          name="productType"
+                          value={form.productType}
+                          onChange={change}
+                        >
+                          <option value="READY_MADE">Ready-made product</option>
+                          <option value="CUSTOM_DESIGN">Custom design</option>
+                        </CFormSelect>
+                      </CCol>
+                    )}
                     <CCol md={6}>
                       <CFormLabel htmlFor="product-categoryId">Category</CFormLabel>
                       <CFormSelect
@@ -343,15 +376,18 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
                         <p className="mt-2">Create a category before adding a product.</p>
                       )}
                     </CCol>
-                    <CCol xs={12}>
-                      <ComponentEditor
-                        items={form.items}
-                        options={subItems}
-                        ready={subReady}
-                        onChange={(items) => setForm((previous) => ({ ...previous, items }))}
-                      />
-                    </CCol>
-                    {form.categoryId &&
+                    {!readyMade && (
+                      <CCol xs={12}>
+                        <ComponentEditor
+                          items={form.items}
+                          options={subItems}
+                          ready={subReady}
+                          onChange={(items) => setForm((previous) => ({ ...previous, items }))}
+                        />
+                      </CCol>
+                    )}
+                    {!readyMade &&
+                      form.categoryId &&
                       subState.categoryId === form.categoryId &&
                       subState.error && (
                         <CCol xs={12}>
@@ -373,6 +409,34 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
                         onChange={setSelectedFile}
                         imageUrl={record?.imageUrl}
                         name={form.name}
+                        required={readyMade && action.mode === 'create'}
+                        processBackground
+                      />
+                    </CCol>
+                    {readyMade &&
+                      input('price', 'Price (€)', {
+                        required: true,
+                        type: 'number',
+                        min: '0',
+                        step: '0.01',
+                      })}
+                    {readyMade &&
+                      input('stock', 'Available stock', {
+                        required: true,
+                        type: 'number',
+                        min: '0',
+                        max: '2147483647',
+                        step: '1',
+                      })}
+                    {input('name', 'Name', { required: true, maxLength: 200 })}
+                    <CCol xs={12}>
+                      <CFormLabel htmlFor="product-description">Description</CFormLabel>
+                      <CFormTextarea
+                        id="product-description"
+                        name="description"
+                        rows={3}
+                        value={form.description}
+                        onChange={change}
                       />
                     </CCol>
                     <CCol xs={12}>
@@ -409,13 +473,19 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
                 loading ||
                 !!loadError ||
                 !isAdmin ||
-                (action.mode === 'create' && (!subReady || !form.items.length || !subItems.length))
+                (action.mode === 'create' &&
+                  !readyMade &&
+                  (!subReady || !form.items.length || !subItems.length))
               }
             >
               {saving ? (
                 <>
                   <CSpinner size="sm" aria-hidden="true" className="me-2" />
-                  {action.mode === 'delete' ? 'Deleting...' : 'Saving...'}
+                  {action.mode === 'delete'
+                    ? 'Deleting...'
+                    : selectedFile
+                      ? 'Saving and processing image...'
+                      : 'Saving...'}
                 </>
               ) : action.mode === 'delete' ? (
                 'Delete Product'

@@ -152,8 +152,16 @@ async function setup(page, overrides = {}) {
           state.writeStatus,
         )
       const body = await requestBody(request)
-      for (const field of ['price', 'unitPrice', 'itemCount', 'createdById', 'subCategoryId'])
+      for (const field of ['unitPrice', 'itemCount', 'createdById', 'subCategoryId'])
         expect(body?.[field]).toBeUndefined()
+      const readyMade =
+        body?.productType === 'READY_MADE' ||
+        state.products.find((record) => record.id === path.split('/')[2])?.productType ===
+          'READY_MADE'
+      if (!readyMade) {
+        expect(body?.price).toBeUndefined()
+        expect(body?.stock).toBeUndefined()
+      }
       if (body?.items) {
         body.items.forEach((item) =>
           expect(Object.keys(item).sort()).toEqual(
@@ -178,11 +186,12 @@ async function setup(page, overrides = {}) {
       }
       expect(body?.createdById).toBeUndefined()
       expect(body?.createdBy).toBeUndefined()
+      if (body?.file) body.imageUrl = 'https://images.example.test/processed-product.png'
       if (method === 'POST') {
         const created = {
           id: '66666666-6666-4666-8666-666666666666',
           ...body,
-          ...totals(body),
+          ...(readyMade ? { items: [], itemCount: 0 } : totals(body)),
         }
         state.products.push(created)
         return fulfill(route, decorate(created), 201)
@@ -210,12 +219,115 @@ const choose = async (page, index, name) => {
 }
 const fillNew = async (page) => {
   await page.getByRole('button', { name: 'Add Product', exact: true }).click()
+  await dialog(page).getByLabel('Product type', { exact: true }).selectOption('CUSTOM_DESIGN')
   await dialog(page).getByLabel('Name', { exact: true }).fill('Gold bracelet')
   await dialog(page).getByLabel('Category', { exact: true }).selectOption(cat2)
   await dialog(page).getByRole('button', { name: 'Add Component' }).click()
   await choose(page, 0, 'Beads')
   await dialog(page).getByLabel('Quantity 1', { exact: true }).fill('8')
 }
+
+test('ready-made creation requires an image, sends price in cents and edits finished stock without components', async ({
+  page,
+}) => {
+  const state = await setup(page)
+  await page.goto('/#/products')
+  await page.getByRole('button', { name: 'Add Product', exact: true }).click()
+  await expect(dialog(page).getByLabel('Product type', { exact: true })).toHaveValue('READY_MADE')
+  await dialog(page).getByLabel('Category', { exact: true }).selectOption(cat2)
+  await dialog(page).getByLabel('Name', { exact: true }).fill('Ready bracelet')
+  await dialog(page).getByLabel('Description', { exact: true }).fill('Handmade and ready to ship')
+  await dialog(page).getByLabel('Price (€)', { exact: true }).fill('32.99')
+  await dialog(page).getByLabel('Available stock', { exact: true }).fill('7')
+  await expect(dialog(page).getByRole('button', { name: 'Add Component' })).toHaveCount(0)
+  expect(state.requests.some((r) => r.path.endsWith('/sub-categories'))).toBe(false)
+  await dialog(page).getByRole('button', { name: 'Save Product', exact: true }).click()
+  await expect(dialog(page).getByRole('alert')).toContainText('Choose an image')
+  expect(state.requests.some((r) => r.method === 'POST')).toBe(false)
+  await dialog(page).getByLabel('Image (required)').setInputFiles(pngFile)
+  await dialog(page).getByRole('button', { name: 'Save Product', exact: true }).click()
+  await expect(dialog(page)).toHaveCount(0)
+  const body = state.requests.find((r) => r.method === 'POST').body
+  expect(body).toMatchObject({
+    productType: 'READY_MADE',
+    categoryId: cat2,
+    name: 'Ready bracelet',
+    price: 3299,
+    stock: 7,
+  })
+  expect(body.file.name).toBe('bead.png')
+  expect(body).not.toHaveProperty('items')
+  await expect(page.getByRole('row').filter({ hasText: 'Ready bracelet' })).toContainText(
+    'Ready-made',
+  )
+  await page.getByRole('button', { name: 'Edit Ready bracelet', exact: true }).click()
+  await expect(dialog(page).getByLabel('Price (€)', { exact: true })).toHaveValue('32.99')
+  await expect(dialog(page).getByLabel('Product type', { exact: true })).toHaveCount(0)
+  await dialog(page).getByLabel('Available stock', { exact: true }).fill('0')
+  await dialog(page).getByLabel('Price (€)', { exact: true }).fill('0.29')
+  await dialog(page).getByRole('button', { name: 'Save Product', exact: true }).click()
+  await expect(dialog(page)).toHaveCount(0)
+  const updated = state.requests.find((r) => r.method === 'PATCH').body
+  expect(updated).toMatchObject({ price: 29, stock: 0 })
+  expect(updated).not.toHaveProperty('items')
+  expect(updated).not.toHaveProperty('file')
+})
+
+test('product image processing preserves drafts on backend errors and shows processed response after save', async ({
+  page,
+}) => {
+  const state = await setup(page)
+  await page.goto('/#/products')
+  await page.getByRole('button', { name: 'Edit Pearl necklace', exact: true }).click()
+  await dialog(page).getByLabel('Name', { exact: true }).fill('Processed necklace')
+  await dialog(page).getByLabel('Image (optional)').setInputFiles(pngFile)
+  await expect(dialog(page)).toContainText('Background will be removed automatically.')
+  const preview = dialog(page).getByRole('img', { name: 'Processed necklace preview', exact: true })
+  await expect(preview).toHaveAttribute('src', /^blob:/)
+  await expect(preview).toHaveCSS('object-fit', 'contain')
+  for (const status of [400, 413, 500]) {
+    const failure = (route) => fulfill(route, { message: `Processing failed (${status})` }, status)
+    await page.route(`**/api/v1/products/${productId}`, failure)
+    await dialog(page).getByRole('button', { name: 'Save Product', exact: true }).click()
+    await expect(dialog(page).getByRole('alert')).toContainText(`Processing failed (${status})`)
+    await expect(dialog(page).getByLabel('Name', { exact: true })).toHaveValue('Processed necklace')
+    await expect(preview).toHaveAttribute('src', /^blob:/)
+    await page.unroute(`**/api/v1/products/${productId}`, failure)
+  }
+  let release
+  const pending = new Promise((resolve) => {
+    release = resolve
+  })
+  await page.route(`**/api/v1/products/${productId}`, async (route) => {
+    await pending
+    await route.fallback()
+  })
+  await dialog(page).getByRole('button', { name: 'Save Product', exact: true }).click()
+  await expect(
+    dialog(page).getByRole('button', { name: 'Saving and processing image...' }),
+  ).toBeDisabled()
+  await dialog(page)
+    .locator('form')
+    .evaluate((form) =>
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })),
+    )
+  release()
+  await expect(dialog(page)).toHaveCount(0)
+  expect(state.requests.filter((r) => r.method === 'PATCH')).toHaveLength(1)
+  const thumbnail = page
+    .getByRole('row')
+    .filter({ hasText: 'Processed necklace' })
+    .locator('.hm-product-image img')
+  await expect(thumbnail).toHaveAttribute(
+    'src',
+    'https://images.example.test/processed-product.png',
+  )
+  await expect(thumbnail).toHaveCSS('object-fit', 'contain')
+  await page.getByRole('button', { name: 'Edit Processed necklace', exact: true }).click()
+  await expect(
+    dialog(page).getByRole('img', { name: 'Processed necklace preview', exact: true }),
+  ).toHaveAttribute('src', 'https://images.example.test/processed-product.png')
+})
 
 test('multiple component CRUD sends complete arrays and displays server totals and saved prices', async ({
   page,
@@ -415,6 +527,7 @@ test('late category response cannot replace the new component options', async ({
   })
   await page.goto('/#/products')
   await page.getByRole('button', { name: 'Add Product' }).click()
+  await dialog(page).getByLabel('Product type', { exact: true }).selectOption('CUSTOM_DESIGN')
   await dialog(page).getByLabel('Category', { exact: true }).selectOption(cat1)
   await requested
   await expect(dialog(page).getByRole('button', { name: 'Add Component' })).toBeDisabled()
@@ -491,7 +604,9 @@ test('product design is separate from catalog image, contains the whole preview 
     )
     await expect(dialog(page)).toContainText('Design preview unavailable')
     await expect(
-      dialog(page).getByRole('link', { name: 'Open full-size customer design' }),
+      dialog(page).getByRole('link', {
+        name: 'Open full-size customer design',
+      }),
     ).toHaveCount(0)
     await dialog(page).getByRole('button', { name: 'Close', exact: true }).last().click()
     await expect(dialog(page)).toHaveCount(0)

@@ -169,6 +169,7 @@ test('Category create, detail, edit and confirmed delete use exact API contracts
     },
     isActive: false,
     sortOrder: 4,
+    sizes: [],
   })
   await expect(page.getByRole('cell', { name: 'Rings', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'View Rings', exact: true }).click()
@@ -198,6 +199,136 @@ test('Category create, detail, edit and confirmed delete use exact API contracts
   expect(
     state.requests.filter((r) => r.method === 'GET' && r.path.includes('/categories/')).length,
   ).toBeGreaterThanOrEqual(4)
+})
+
+const fillSize = async (page, index, name, measurement, maxItems) => {
+  await dialog(page).getByRole('button', { name: '+ Add Size', exact: true }).click()
+  await dialog(page).getByLabel(`Size ${index} Name`, { exact: true }).fill(name)
+  await dialog(page)
+    .getByLabel(`Size ${index} Measurement`, { exact: true })
+    .fill(String(measurement))
+  await dialog(page).getByLabel(`Size ${index} Max Items`, { exact: true }).fill(String(maxItems))
+}
+
+test('category sizes support create, edit, add, remove, empty and null with image preservation', async ({
+  page,
+}) => {
+  const state = await setup(page, { categories: [{ ...baseCategory, sizes: null }] })
+  await page.goto('/#/categories')
+  await expect(page.getByRole('row').filter({ hasText: baseCategory.name })).toContainText(
+    'No sizes',
+  )
+  await page.getByRole('button', { name: 'Create Category', exact: true }).click()
+  await dialog(page).getByLabel('Name', { exact: true }).fill('Sized bracelets')
+  await dialog(page).getByLabel('Image (optional)').setInputFiles(pngFile)
+  await fillSize(page, 1, 'Small', 16.5, 16)
+  await dialog(page).getByRole('button', { name: 'Save Category', exact: true }).click()
+  await expect(dialog(page)).toHaveCount(0)
+  expect(state.requests.find((r) => r.method === 'POST').body.sizes).toEqual([
+    { id: 'small', name: 'Small', measurement: 16.5, unit: 'cm', maxItems: 16 },
+  ])
+  const row = page.getByRole('row').filter({ hasText: 'Sized bracelets' })
+  await expect(row).toContainText('1 size')
+  await page.getByRole('button', { name: 'Edit Sized bracelets', exact: true }).click()
+  await expect(dialog(page).getByLabel('Size 1 Measurement', { exact: true })).toHaveValue('16.5')
+  await dialog(page).getByLabel('Size 1 Name', { exact: true }).fill('Extra Small')
+  await dialog(page).getByLabel('Size 1 Unit', { exact: true }).fill('mm')
+  await fillSize(page, 2, 'Medium', 18, 18)
+  await dialog(page).getByRole('button', { name: 'Save Category', exact: true }).click()
+  await expect(dialog(page)).toHaveCount(0)
+  const updated = state.requests.filter((r) => r.method === 'PATCH').at(-1).body
+  expect(updated.sizes).toEqual([
+    { id: 'extra-small', name: 'Extra Small', measurement: 16.5, unit: 'mm', maxItems: 16 },
+    { id: 'medium', name: 'Medium', measurement: 18, unit: 'cm', maxItems: 18 },
+  ])
+  expect(updated).not.toHaveProperty('file')
+  await expect(row).toContainText('2 sizes')
+  await page.getByRole('button', { name: 'View Sized bracelets', exact: true }).click()
+  await expect(dialog(page)).toContainText('Extra Small')
+  await dialog(page).getByRole('button', { name: 'Close', exact: true }).last().click()
+  await page.getByRole('button', { name: 'Edit Sized bracelets', exact: true }).click()
+  await dialog(page).getByRole('button', { name: 'Remove size 1' }).click()
+  await dialog(page).getByRole('button', { name: 'Remove size 1' }).click()
+  expect(state.requests.filter((r) => r.method === 'PATCH')).toHaveLength(1)
+  await dialog(page).getByRole('button', { name: 'Save Category', exact: true }).click()
+  await expect(dialog(page)).toHaveCount(0)
+  expect(state.requests.filter((r) => r.method === 'PATCH').at(-1).body.sizes).toEqual([])
+  expect(state.categories.find((c) => c.name === 'Sized bracelets').imageUrl).toBe(
+    'https://example.com/uploaded.png',
+  )
+  await expect(row).toContainText('No sizes')
+})
+
+test('multiple sizes block duplicate generated IDs and invalid limits before sending requests', async ({
+  page,
+}) => {
+  const state = await setup(page)
+  await page.goto('/#/categories')
+  await page.getByRole('button', { name: 'Create Category', exact: true }).click()
+  await dialog(page).getByLabel('Name', { exact: true }).fill('Custom sizes')
+  await fillSize(page, 1, 'Extra Large', 20, 20)
+  await fillSize(page, 2, 'Extra-Large', 22, 22)
+  await dialog(page).getByRole('button', { name: 'Save Category', exact: true }).click()
+  await expect(dialog(page).getByRole('alert')).toContainText('unique IDs')
+  expect(state.requests.some((r) => r.method === 'POST')).toBe(false)
+  await dialog(page).getByLabel('Size 2 Name', { exact: true }).fill('Medium')
+  for (const value of ['0', '-1', '1.5']) {
+    await dialog(page).getByLabel('Size 2 Max Items', { exact: true }).fill(value)
+    await dialog(page).getByRole('button', { name: 'Save Category', exact: true }).click()
+    expect(state.requests.some((r) => r.method === 'POST')).toBe(false)
+  }
+  await dialog(page).getByLabel('Size 2 Max Items', { exact: true }).fill('22')
+  await dialog(page).getByLabel('Size 2 Measurement', { exact: true }).fill('0')
+  await dialog(page).getByRole('button', { name: 'Save Category', exact: true }).click()
+  await expect(dialog(page).getByRole('alert')).toContainText(
+    'measurement must be greater than zero',
+  )
+  await dialog(page).getByLabel('Size 2 Measurement', { exact: true }).fill('22')
+  await dialog(page).getByRole('button', { name: 'Save Category', exact: true }).click()
+  await expect(dialog(page)).toHaveCount(0)
+  expect(state.requests.find((r) => r.method === 'POST').body.sizes.map((s) => s.id)).toEqual([
+    'extra-large',
+    'medium',
+  ])
+})
+
+test('subcategory processing uses returned images and preserves drafts on upload errors; categories stay unchanged', async ({
+  page,
+}) => {
+  const state = await setup(page)
+  await page.route('https://example.com/uploaded.png', (route) =>
+    route.fulfill({ contentType: 'image/png', body: pngFile.buffer }),
+  )
+  await page.goto('/#/sub-categories')
+  await page.getByRole('button', { name: 'Edit Pearl pendant', exact: true }).click()
+  await dialog(page).getByLabel('Image (optional)').setInputFiles(pngFile)
+  await expect(dialog(page)).toContainText('Background will be removed automatically.')
+  const preview = dialog(page).getByRole('img', { name: 'Pearl pendant preview', exact: true })
+  await expect(preview).toHaveAttribute('src', /^blob:/)
+  await expect(preview).toHaveCSS('object-fit', 'contain')
+  const failure = (route) =>
+    fulfill(route, { message: 'Image processing service unavailable' }, 500)
+  await page.route(`**/api/v1/sub-categories/${subId}`, failure)
+  await dialog(page).getByRole('button', { name: 'Save SubCategory', exact: true }).click()
+  await expect(dialog(page).getByRole('alert')).toContainText(
+    'Image processing service unavailable',
+  )
+  await expect(preview).toHaveAttribute('src', /^blob:/)
+  await page.unroute(`**/api/v1/sub-categories/${subId}`, failure)
+  await dialog(page).getByRole('button', { name: 'Save SubCategory', exact: true }).click()
+  await expect(dialog(page)).toHaveCount(0)
+  const thumbnail = page
+    .getByRole('row')
+    .filter({ hasText: 'Pearl pendant' })
+    .locator('.hm-product-image img')
+  await expect(thumbnail).toHaveAttribute('src', 'https://example.com/uploaded.png')
+  await expect(thumbnail).toHaveCSS('object-fit', 'contain')
+  expect(state.requests.filter((r) => r.method === 'PATCH')).toHaveLength(1)
+  await page.goto('/#/categories')
+  await page.getByRole('button', { name: 'Edit Necklaces', exact: true }).click()
+  await dialog(page).getByLabel('Image (optional)').setInputFiles(pngFile)
+  await expect(dialog(page)).not.toContainText('Background will be removed automatically.')
+  await expect(dialog(page).locator('.hm-product-image-transparent')).toHaveCount(0)
 })
 
 test('SubCategory dropdown displays category names, submits IDs, and supports full CRUD', async ({

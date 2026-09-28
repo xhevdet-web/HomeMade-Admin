@@ -133,6 +133,8 @@ const Products = () => {
                   'Design',
                   'Name',
                   'Category',
+                  'Product type',
+                  'Stock',
                   'Components',
                   'Creator',
                   'Item count',
@@ -151,16 +153,26 @@ const Products = () => {
                 filtered.map((product) => (
                   <CTableRow key={product.id}>
                     <CTableDataCell>
-                      <ProductImage src={product.imageUrl} name={product.name} />
+                      <ProductImage src={product.imageUrl} name={product.name} transparent />
                     </CTableDataCell>
                     <CTableDataCell>
-                      <DesignPreview src={product.designPreviewUrl} name={product.name} />
+                      {product.productType === 'READY_MADE' ? (
+                        '—'
+                      ) : (
+                        <DesignPreview src={product.designPreviewUrl} name={product.name} />
+                      )}
                     </CTableDataCell>
                     <CTableDataCell>
                       <strong>{product.name}</strong>
                     </CTableDataCell>
                     <CTableDataCell>
                       {product.category?.name || 'Unavailable category'}
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      {product.productType === 'READY_MADE' ? 'Ready-made' : 'Custom design'}
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      {product.productType === 'READY_MADE' ? product.stock : '—'}
                     </CTableDataCell>
                     <CTableDataCell>{componentSummary(product.items)}</CTableDataCell>
                     <CTableDataCell>{creatorName(product.createdBy)}</CTableDataCell>
@@ -212,7 +224,7 @@ const Products = () => {
                 ))
               ) : (
                 <CTableRow>
-                  <CTableDataCell colSpan={10}>
+                  <CTableDataCell colSpan={12}>
                     <EmptyState
                       title={query ? 'No matching products' : 'No products yet'}
                       description={
@@ -232,7 +244,13 @@ const Products = () => {
         <ProductDialog
           action={action}
           onClose={() => setAction(null)}
-          onSaved={(message) => {
+          onSaved={(message, saved) => {
+            if (saved)
+              setProducts((previous) =>
+                previous.some((product) => product.id === saved.id)
+                  ? previous.map((product) => (product.id === saved.id ? saved : product))
+                  : [...previous, saved],
+              )
             setAction(null)
             setNotice(message)
             setRevision((value) => value + 1)

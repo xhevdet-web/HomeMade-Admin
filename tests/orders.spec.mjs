@@ -678,6 +678,66 @@ test('order design is prominent with saved materials and historical total throug
   )
 })
 
+test('ready-made orders show the purchased product image in list and detail with legacy fallback', async ({
+  page,
+}) => {
+  const purchased = {
+    ...product,
+    productType: 'READY_MADE',
+    designPreviewUrl: null,
+    imageUrl: 'https://images.example.test/purchased-bracelet.png',
+    items: [],
+    itemCount: 0,
+  }
+  const order = {
+    ...makeOrder(0),
+    designPreviewUrl: null,
+    designSnapshot: { version: 1, product: purchased, ownedImageKeys: [] },
+    product: {
+      ...purchased,
+      name: 'Changed catalog name',
+      imageUrl: 'https://images.example.test/changed.png',
+    },
+  }
+  const state = await setup(page, { orders: [order] })
+  await page.goto('/#/orders')
+  const thumbnail = page.locator('.hm-orders-table .hm-design-preview img')
+  await expect(thumbnail).toHaveAttribute('src', purchased.imageUrl)
+  const row = page.getByRole('row').filter({ hasText: 'HM-2026-000001' })
+  await expect(row).toContainText(product.name)
+  await expect(row).toContainText('Ready-made product')
+  await expect(row).not.toContainText('Unavailable product')
+  await openFirst(page)
+  const design = dialog(page).locator('.hm-customer-design')
+  await expect(design).toContainText('READY-MADE PRODUCT')
+  await expect(design.getByRole('heading', { name: product.name })).toBeVisible()
+  await expect(design.locator('.hm-design-preview-large img')).toHaveAttribute(
+    'src',
+    purchased.imageUrl,
+  )
+  await expect(design.getByRole('link', { name: 'Open full-size product image' })).toHaveAttribute(
+    'href',
+    purchased.imageUrl,
+  )
+  await expect(design).not.toContainText('Components / materials')
+  await expect(design.locator('.hm-design-total')).toContainText('\u20ac29.99')
+  await expect(design).toContainText('1 finished product')
+  await expect(dialog(page).getByRole('heading', { name: 'Product', exact: true })).toHaveCount(0)
+  await page.screenshot({ path: 'test-results/ready-made-order-details.png' })
+  await dialog(page).getByRole('button', { name: 'Close', exact: true }).click()
+  state.orders[0] = { ...order, designSnapshot: null, product: purchased }
+  await page.getByRole('button', { name: 'Refresh orders', exact: true }).click()
+  await expect(thumbnail).toHaveAttribute('src', purchased.imageUrl)
+  state.orders[0].product.imageUrl = 'https://images.example.test/broken.png'
+  await page.route('https://images.example.test/broken.png', (route) => route.abort())
+  await page.getByRole('button', { name: 'Refresh orders', exact: true }).click()
+  await expect(thumbnail).toHaveAttribute('src', /(?:catalog-placeholder|^data:image\/svg\+xml)/)
+  await openFirst(page)
+  await expect(dialog(page).locator('.hm-customer-design')).toContainText(
+    'Product image unavailable',
+  )
+})
+
 test('order design fallback uses bundled image and never falls back to the catalog image', async ({
   page,
 }) => {
@@ -693,7 +753,91 @@ test('order design fallback uses bundled image and never falls back to the catal
     'src',
     /(?:catalog-placeholder|^data:image\/svg\+xml)/,
   )
-  await expect(
-    dialog(page).locator('.hm-order-product-summary .hm-product-image').first().getByRole('img'),
-  ).toHaveAttribute('src', product.imageUrl)
+  await expect(dialog(page).getByRole('heading', { name: 'Product', exact: true })).toHaveCount(0)
+})
+
+for (const productType of ['CUSTOM_DESIGN', 'READY_MADE']) {
+  test(`${productType} order details show the purchased size rather than current category sizes`, async ({
+    page,
+  }) => {
+    const selectedSize = { id: 'medium', name: 'Medium', measurement: 18, unit: 'cm', maxItems: 18 }
+    const purchased = { ...product, productType, selectedSize }
+    await setup(page, {
+      orders: [
+        {
+          ...makeOrder(0),
+          designSnapshot: { version: 1, product: purchased, ownedImageKeys: [] },
+          product: {
+            ...purchased,
+            selectedSize: { ...selectedSize, name: 'Large', measurement: 22 },
+          },
+        },
+      ],
+    })
+    await page.goto('/#/orders')
+    await openFirst(page)
+    await expect(
+      dialog(page).locator('.hm-order-facts').filter({ hasText: 'Purchased size' }),
+    ).toContainText('Medium · 18 cm')
+    await expect(dialog(page).locator('.hm-customer-design')).not.toContainText('Large · 22 cm')
+  })
+}
+
+test('null and older snapshots show Size not recorded without inferring current sizes', async ({
+  page,
+}) => {
+  const selectedSize = { id: 'medium', name: 'Medium', measurement: 18, unit: 'cm', maxItems: 18 }
+  const current = {
+    ...product,
+    selectedSize,
+    category: { ...product.category, sizes: [selectedSize] },
+  }
+  await setup(page, {
+    orders: [
+      { ...makeOrder(0), product: { ...current, selectedSize: null } },
+      {
+        ...makeOrder(1),
+        product: current,
+        designSnapshot: { version: 1, product: { ...product, selectedSize: null } },
+      },
+      { ...makeOrder(2), product: current, designSnapshot: { version: 1, product } },
+    ],
+  })
+  await page.goto('/#/orders')
+  for (const number of ['000001', '000002', '000003']) {
+    await page.getByRole('button', { name: `View details HM-2026-${number}`, exact: true }).click()
+    await expect(dialog(page).locator('.hm-customer-design')).toContainText('Size not recorded')
+    await expect(dialog(page).locator('.hm-customer-design')).not.toContainText('Medium · 18 cm')
+    await dialog(page).getByRole('button', { name: 'Close', exact: true }).click()
+    await expect(dialog(page)).toHaveCount(0)
+  }
+})
+
+test('versioned custom-design snapshot restores product name, preview and component details', async ({
+  page,
+}) => {
+  const saved = { ...product, productType: 'CUSTOM_DESIGN', name: 'Ordered custom necklace' }
+  await setup(page, {
+    orders: [
+      {
+        ...makeOrder(0),
+        designSnapshot: { version: 1, product: saved, ownedImageKeys: [] },
+        product: { ...product, name: 'Changed catalog name', itemCount: 1, items: [] },
+      },
+    ],
+  })
+  await page.goto('/#/orders')
+  const row = page.getByRole('row').filter({ hasText: 'HM-2026-000001' })
+  await expect(row).toContainText('Ordered custom necklace')
+  await expect(row).toContainText('Custom design')
+  await expect(row).toContainText('24 beads')
+  await expect(row).not.toContainText('Changed catalog name')
+  await openFirst(page)
+  await expect(dialog(page).getByRole('heading', { name: 'Ordered custom necklace' })).toBeVisible()
+  await expect(dialog(page).locator('.hm-customer-design')).toContainText('Components / materials')
+  await expect(dialog(page).locator('.hm-customer-design')).toContainText('Pearls')
+  await expect(dialog(page).locator('.hm-design-preview-large img')).toHaveAttribute(
+    'src',
+    product.designPreviewUrl,
+  )
 })

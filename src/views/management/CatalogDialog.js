@@ -24,6 +24,7 @@ import ProductImage from '../products/ProductImage'
 import ImagePicker from '../../components/ImagePicker'
 import { imageFormData } from '../../_helpers/imageUpload'
 import { catalogConfig, catalogPayload, emptyCatalogForm } from './catalogFields'
+import CategorySizesEditor from './CategorySizesEditor'
 
 const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
   const { singular, endpoint } = catalogConfig[kind]
@@ -109,14 +110,29 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
     submitting.current = true
     setSaving(true)
     try {
+      let saved
       if (action.mode === 'delete') await api.delete(`${endpoint}/${encodeURIComponent(action.id)}`)
       else {
-        const payload = imageFormData(catalogPayload(form, isSubCategory), selectedFile)
-        if (action.mode === 'create') await api.post(endpoint, payload)
-        else await api.patch(`${endpoint}/${encodeURIComponent(action.id)}`, payload)
+        let fields
+        try {
+          fields = catalogPayload(form, isSubCategory)
+        } catch (validationError) {
+          setError(validationError.message)
+          return
+        }
+        const payload = imageFormData(fields, selectedFile)
+        const options = { timeout: isSubCategory && selectedFile ? 120000 : 15000 }
+        if (action.mode === 'create') saved = await api.post(endpoint, payload, options)
+        else
+          saved = await api.patch(`${endpoint}/${encodeURIComponent(action.id)}`, payload, options)
+      }
+      if (saved) {
+        setRecord(saved.data)
+        setSelectedFile(null)
       }
       onSaved(
         `${singular} ${action.mode === 'delete' ? 'deleted' : action.mode === 'create' ? 'created' : 'updated'} successfully.`,
+        saved?.data,
       )
     } catch (error) {
       setError(apiErrorMessage(error))
@@ -201,7 +217,12 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
               )}
               {action.mode === 'view' ? (
                 <>
-                  <ProductImage src={record?.imageUrl} name={record?.name} large />
+                  <ProductImage
+                    src={record?.imageUrl}
+                    name={record?.name}
+                    transparent={isSubCategory}
+                    large
+                  />
                   <dl className="hm-catalog-details">
                     {fields.map(([label, value]) => (
                       <div key={label}>
@@ -214,6 +235,21 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                       </div>
                     ))}
                   </dl>
+                  {!isSubCategory && (
+                    <section className="mt-4">
+                      <h3>Sizes</h3>
+                      {record?.sizes?.length ? (
+                        record.sizes.map((size) => (
+                          <p key={size.id}>
+                            <strong>{size.name}</strong> · {size.measurement} {size.unit} · Max
+                            Items: {size.maxItems}
+                          </p>
+                        ))
+                      ) : (
+                        <p className="hm-muted">No sizes</p>
+                      )}
+                    </section>
+                  )}
                 </>
               ) : action.mode === 'delete' ? (
                 <>
@@ -287,6 +323,7 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                         onChange={setSelectedFile}
                         imageUrl={record?.imageUrl}
                         name={form.name}
+                        processBackground={isSubCategory}
                       />
                     </CCol>
                     {isSubCategory && (
@@ -312,6 +349,12 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                       />
                     </CCol>
                   </CRow>
+                  {!isSubCategory && (
+                    <CategorySizesEditor
+                      sizes={form.sizes}
+                      onChange={(sizes) => setForm((previous) => ({ ...previous, sizes }))}
+                    />
+                  )}
                 </fieldset>
               )}
             </>
@@ -338,7 +381,7 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
               {saving ? (
                 <>
                   <CSpinner size="sm" aria-hidden="true" className="me-2" />
-                  Saving...
+                  {isSubCategory && selectedFile ? 'Saving and processing image...' : 'Saving...'}
                 </>
               ) : action.mode === 'delete' ? (
                 `Delete ${singular}`

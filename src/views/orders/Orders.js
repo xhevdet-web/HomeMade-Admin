@@ -23,7 +23,16 @@ import { formatPrice } from '../products/productHelpers'
 import OrderBadge from './OrderBadge'
 import OrderDetails from './OrderDetails'
 import CreateOrderDialog from './CreateOrderDialog'
-import { orderDate, paymentLabels, paymentTypes, personName, statusLabels } from './orderHelpers'
+import {
+  orderDate,
+  paymentLabels,
+  paymentTypes,
+  personName,
+  statusLabels,
+  orderedProduct,
+  orderDesignImage,
+  orderProductLabel,
+} from './orderHelpers'
 
 const emptyFilters = { orderNumber: '', status: '', paymentStatus: '', paymentType: '', userId: '' }
 const Orders = () => {
@@ -279,11 +288,22 @@ const Orders = () => {
                       </button>
                     </CTableDataCell>
                     <CTableDataCell>{personName(order.user)}</CTableDataCell>
-                    <CTableDataCell>{order.product?.name || 'Unavailable product'}</CTableDataCell>
+                    <CTableDataCell>
+                      <div className="hm-order-product-info">
+                        <strong>{orderedProduct(order)?.name || 'Unavailable product'}</strong>
+                        <span className="hm-badge">{orderProductLabel(order)}</span>
+                        <small>
+                          {orderedProduct(order)?.category?.name || 'Category unavailable'}
+                          {orderedProduct(order)?.productType !== 'READY_MADE' &&
+                            ` · ${orderedProduct(order)?.itemCount ?? 0} beads`}
+                        </small>
+                      </div>
+                    </CTableDataCell>
                     <CTableDataCell>
                       <DesignPreview
-                        src={order.product?.designPreviewUrl}
-                        name={order.product?.name}
+                        src={orderDesignImage(order)}
+                        name={orderedProduct(order)?.name}
+                        readyMade={orderedProduct(order)?.productType === 'READY_MADE'}
                       />
                     </CTableDataCell>
                     <CTableDataCell className="text-nowrap">

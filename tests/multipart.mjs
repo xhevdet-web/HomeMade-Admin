@@ -21,7 +21,7 @@ export async function requestBody(request) {
     body[key] =
       key === 'file'
         ? { name: value.name, type: value.type, size: value.size }
-        : key === 'items'
+        : ['items', 'sizes'].includes(key)
           ? JSON.parse(value)
           : key === 'isActive'
             ? value === 'true'

@@ -60,7 +60,7 @@ const CatalogPage = ({ kind }) => {
   const columns = [
     'Image',
     'Name',
-    ...(isSubCategory ? ['Category', 'Color', 'Price (cents)', 'Stock'] : []),
+    ...(isSubCategory ? ['Category', 'Color', 'Price (cents)', 'Stock'] : ['Description', 'Sizes']),
     'Status',
     'Sort order',
     'Actions',
@@ -145,7 +145,11 @@ const CatalogPage = ({ kind }) => {
                 filtered.map((record) => (
                   <CTableRow key={record.id}>
                     <CTableDataCell>
-                      <ProductImage src={record.imageUrl} name={record.name} />
+                      <ProductImage
+                        src={record.imageUrl}
+                        name={record.name}
+                        transparent={isSubCategory}
+                      />
                     </CTableDataCell>
                     <CTableDataCell>
                       <strong>{record.name}</strong>
@@ -175,6 +179,16 @@ const CatalogPage = ({ kind }) => {
                         </CTableDataCell>
                         <CTableDataCell>{record.price}</CTableDataCell>
                         <CTableDataCell>{record.stock}</CTableDataCell>
+                      </>
+                    )}
+                    {!isSubCategory && (
+                      <>
+                        <CTableDataCell>{record.description || 'Not provided'}</CTableDataCell>
+                        <CTableDataCell>
+                          {record.sizes?.length
+                            ? `${record.sizes.length} ${record.sizes.length === 1 ? 'size' : 'sizes'}`
+                            : 'No sizes'}
+                        </CTableDataCell>
                       </>
                     )}
                     <CTableDataCell>
@@ -239,7 +253,13 @@ const CatalogPage = ({ kind }) => {
           kind={kind}
           action={action}
           onClose={() => setAction(null)}
-          onSaved={(message) => {
+          onSaved={(message, saved) => {
+            if (saved)
+              setRecords((previous) =>
+                previous.some((record) => record.id === saved.id)
+                  ? previous.map((record) => (record.id === saved.id ? saved : record))
+                  : [...previous, saved],
+              )
             setAction(null)
             setNotice(message)
             setRevision((value) => value + 1)

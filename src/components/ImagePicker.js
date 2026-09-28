@@ -1,13 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { CAlert, CButton, CFormInput, CFormLabel } from '@coreui/react'
 import ProductImage from '../views/products/ProductImage'
 import { validateImageFile } from '../_helpers/imageUpload'
 
-const ImagePicker = ({ id, file, onChange, imageUrl, name }) => {
+const ImagePicker = ({
+  id,
+  file,
+  onChange,
+  imageUrl,
+  name,
+  required = false,
+  processBackground = false,
+}) => {
   const [preview, setPreview] = useState(null)
   const [error, setError] = useState(null)
   const [inputKey, setInputKey] = useState(0)
+  const inputRef = useRef(null)
   useEffect(() => {
     if (!file) {
       setPreview(null)
@@ -19,8 +28,10 @@ const ImagePicker = ({ id, file, onChange, imageUrl, name }) => {
   }, [file])
   return (
     <>
-      <CFormLabel htmlFor={id}>Image (optional)</CFormLabel>
+      <CFormLabel htmlFor={id}>{required ? 'Image (required)' : 'Image (optional)'}</CFormLabel>
       <CFormInput
+        ref={inputRef}
+        className="hm-image-input"
         key={inputKey}
         id={id}
         type="file"
@@ -35,33 +46,62 @@ const ImagePicker = ({ id, file, onChange, imageUrl, name }) => {
           else onChange(selected)
         }}
       />
-      <p id={`${id}-help`} className="hm-muted mt-2">
-        JPEG, PNG, or WebP. Maximum 5 MB.
-      </p>
       {error && (
         <CAlert color="danger" role="alert">
           {error}
         </CAlert>
       )}
-      <ProductImage src={preview || imageUrl} name={name} large />
-      {file && (
-        <div className="mt-2">
-          <span>{file.name}</span>{' '}
-          <CButton
-            type="button"
-            color="secondary"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              onChange(null)
-              setError(null)
-              setInputKey((value) => value + 1)
-            }}
-          >
-            Cancel image selection
-          </CButton>
+      <div className="hm-image-upload-card">
+        <ProductImage src={preview || imageUrl} name={name} transparent={processBackground} large />
+        <div className="hm-image-upload-content">
+          <span className="hm-image-upload-eyebrow">
+            {file ? 'Selected image' : imageUrl ? 'Current image' : 'Product photo'}
+          </span>
+          <strong className="hm-image-upload-filename" title={file?.name}>
+            {file?.name || (imageUrl ? 'Your saved image' : 'Choose a photo')}
+          </strong>
+          <p id={`${id}-help`}>JPEG, PNG, or WebP · Maximum 5 MB</p>
+          {processBackground && file && (
+            <div className="hm-image-processing-note">
+              <span aria-hidden="true">✦</span>
+              <span>Background will be removed automatically.</span>
+            </div>
+          )}
+          <div className="hm-image-upload-actions">
+            <CButton
+              type="button"
+              color="primary"
+              variant="outline"
+              size="sm"
+              onClick={() => inputRef.current?.click()}
+            >
+              {file || imageUrl ? 'Change image' : 'Choose image'}
+            </CButton>
+            {file && (
+              <CButton
+                type="button"
+                color="danger"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  onChange(null)
+                  setError(null)
+                  setInputKey((value) => value + 1)
+                }}
+              >
+                Remove selected image
+              </CButton>
+            )}
+          </div>
+          {file && (
+            <small className="hm-image-upload-footnote">
+              {imageUrl
+                ? 'Your current image stays until you save.'
+                : 'Your image will be uploaded when you save.'}
+            </small>
+          )}
         </div>
-      )}
+      </div>
     </>
   )
 }
@@ -71,5 +111,7 @@ ImagePicker.propTypes = {
   onChange: PropTypes.func.isRequired,
   imageUrl: PropTypes.string,
   name: PropTypes.string,
+  required: PropTypes.bool,
+  processBackground: PropTypes.bool,
 }
 export default ImagePicker
