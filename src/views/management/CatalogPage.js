@@ -13,11 +13,31 @@ import {
   CTableHeaderCell,
   CTableDataCell,
 } from '@coreui/react'
+import { Link } from 'react-router-dom'
 import api, { apiErrorMessage } from '../../_helpers/api'
 import EmptyState from '../../components/EmptyState'
 import CatalogDialog from './CatalogDialog'
 import ProductImage from '../products/ProductImage'
-import { catalogConfig } from './catalogFields'
+import { builderLabels, catalogConfig, legacyApparelOptions } from './catalogFields'
+
+const configurationSummary = (record) => {
+  if (record.builderType === 'JEWELRY') {
+    const count = record.sizes?.length || 0
+    return count ? `${count} ${count === 1 ? 'size' : 'sizes'}` : 'Not configured'
+  }
+  if (record.builderType === 'APPAREL') {
+    const extras = (record.options || []).length - legacyApparelOptions(record.options || []).length
+    const parts = ['Garments']
+    if (extras) parts.push(`${extras} extra ${extras === 1 ? 'option' : 'options'}`)
+    if (legacyApparelOptions(record.options || []).length) parts.push('old size/colour options')
+    return parts.join(' · ')
+  }
+  if (['BOUQUET', 'GIFT'].includes(record.builderType)) {
+    const count = record.options?.length || 0
+    return count ? `${count} ${count === 1 ? 'option' : 'options'}` : 'Not configured'
+  }
+  return 'Not configured'
+}
 
 const CatalogPage = ({ kind }) => {
   const { title, singular, endpoint, description } = catalogConfig[kind]
@@ -60,7 +80,9 @@ const CatalogPage = ({ kind }) => {
   const columns = [
     'Image',
     'Name',
-    ...(isSubCategory ? ['Category', 'Color', 'Price (cents)', 'Stock'] : ['Description', 'Sizes']),
+    ...(isSubCategory
+      ? ['Category', 'Color', 'Price (cents)', 'Stock']
+      : ['Type', 'Configuration']),
     'Status',
     'Sort order',
     'Actions',
@@ -148,7 +170,7 @@ const CatalogPage = ({ kind }) => {
                       <ProductImage
                         src={record.imageUrl}
                         name={record.name}
-                        transparent={isSubCategory}
+                        transparent
                       />
                     </CTableDataCell>
                     <CTableDataCell>
@@ -178,17 +200,15 @@ const CatalogPage = ({ kind }) => {
                           </span>
                         </CTableDataCell>
                         <CTableDataCell>{record.price}</CTableDataCell>
-                        <CTableDataCell>{record.stock}</CTableDataCell>
+                        <CTableDataCell>
+                          {record.trackStock === false ? 'Unlimited' : record.stock}
+                        </CTableDataCell>
                       </>
                     )}
                     {!isSubCategory && (
                       <>
-                        <CTableDataCell>{record.description || 'Not provided'}</CTableDataCell>
-                        <CTableDataCell>
-                          {record.sizes?.length
-                            ? `${record.sizes.length} ${record.sizes.length === 1 ? 'size' : 'sizes'}`
-                            : 'No sizes'}
-                        </CTableDataCell>
+                        <CTableDataCell>{builderLabels[record.builderType] || 'Not configured'}</CTableDataCell>
+                        <CTableDataCell>{configurationSummary(record)}</CTableDataCell>
                       </>
                     )}
                     <CTableDataCell>
@@ -217,6 +237,17 @@ const CatalogPage = ({ kind }) => {
                         >
                           Edit
                         </CButton>
+                        {!isSubCategory && record.builderType === 'APPAREL' && (
+                          <CButton
+                            as={Link}
+                            to={`/categories/${record.id}/garments`}
+                            color="primary"
+                            size="sm"
+                            aria-label={`Garments of ${record.name}`}
+                          >
+                            Garments
+                          </CButton>
+                        )}
                         <CButton
                           color="danger"
                           variant="outline"

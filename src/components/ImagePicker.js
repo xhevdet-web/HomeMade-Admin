@@ -12,6 +12,8 @@ const ImagePicker = ({
   name,
   required = false,
   processBackground = false,
+  label,
+  hint,
 }) => {
   const [preview, setPreview] = useState(null)
   const [error, setError] = useState(null)
@@ -28,7 +30,9 @@ const ImagePicker = ({
   }, [file])
   return (
     <>
-      <CFormLabel htmlFor={id}>{required ? 'Image (required)' : 'Image (optional)'}</CFormLabel>
+      <CFormLabel htmlFor={id}>
+        {label || (required ? 'Image (required)' : 'Image (optional)')}
+      </CFormLabel>
       <CFormInput
         ref={inputRef}
         className="hm-image-input"
@@ -60,7 +64,7 @@ const ImagePicker = ({
           <strong className="hm-image-upload-filename" title={file?.name}>
             {file?.name || (imageUrl ? 'Your saved image' : 'Choose a photo')}
           </strong>
-          <p id={`${id}-help`}>JPEG, PNG, or WebP · Maximum 5 MB</p>
+          <p id={`${id}-help`}>JPEG, PNG, or WebP · Maximum 5 MB{hint ? ` · ${hint}` : ''}</p>
           {processBackground && file && (
             <div className="hm-image-processing-note">
               <span aria-hidden="true">✦</span>
@@ -113,5 +117,7 @@ ImagePicker.propTypes = {
   name: PropTypes.string,
   required: PropTypes.bool,
   processBackground: PropTypes.bool,
+  label: PropTypes.string,
+  hint: PropTypes.string,
 }
 export default ImagePicker

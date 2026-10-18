@@ -23,8 +23,16 @@ import api, { apiErrorMessage } from '../../_helpers/api'
 import ProductImage from '../products/ProductImage'
 import ImagePicker from '../../components/ImagePicker'
 import { imageFormData } from '../../_helpers/imageUpload'
-import { catalogConfig, catalogPayload, emptyCatalogForm } from './catalogFields'
+import {
+  catalogConfig,
+  catalogPayload,
+  defaultBuilderOptions,
+  emptyCatalogForm,
+} from './catalogFields'
 import CategorySizesEditor from './CategorySizesEditor'
+import CategoryOptionsEditor from './CategoryOptionsEditor'
+import { builderLabels } from './catalogFields'
+import { designTypes } from '../garments/garmentHelpers'
 
 const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
   const { singular, endpoint } = catalogConfig[kind]
@@ -37,6 +45,8 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
   const [loadError, setLoadError] = useState(null)
   const [error, setError] = useState(null)
   const [selectedFile, setSelectedFile] = useState(null)
+  const [removeBackground, setRemoveBackground] = useState(true)
+  const [customType, setCustomType] = useState(false)
   const submitting = useRef(false)
   const [saving, setSaving] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -51,8 +61,9 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
         : api.get(`${endpoint}/${encodeURIComponent(action.id)}`, {
             signal: controller.signal,
           })
+    // Sub-categories pick a parent; categories pick an optional design library.
     const options =
-      isSubCategory && editing
+      editing || (!isSubCategory && action.mode === 'view')
         ? api.get('/categories', { signal: controller.signal })
         : Promise.resolve(null)
     Promise.all([detail, options])
@@ -65,14 +76,14 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
           throw new Error('Invalid detail response')
         setRecord(data)
         setCategories(optionsResponse?.data || [])
-        setForm(
-          Object.fromEntries(
+        const nextForm = Object.fromEntries(
             Object.entries(emptyCatalogForm).map(([key, fallback]) => [
               key,
               data?.[key] ?? fallback,
             ]),
-          ),
-        )
+          )
+        setCustomType(!!nextForm.type && !designTypes[nextForm.type])
+        setForm(nextForm)
       })
       .catch((error) => {
         if (!controller.signal.aborted)
@@ -89,6 +100,27 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
     setForm((previous) => ({
       ...previous,
       [name]: type === 'checkbox' ? checked : value,
+    }))
+  }
+  const changeBuilderType = (event) => {
+    const builderType = event.target.value
+    const hasConfiguration =
+      form.sizes?.length > 0 ||
+      form.options?.some(
+        (option) => option.values?.length > 0 || ['number', 'text'].includes(option.type),
+      )
+    if (
+      builderType !== form.builderType &&
+      hasConfiguration &&
+      !window.confirm('Changing builder type will discard the current configuration. Continue?')
+    )
+      return
+    setForm((previous) => ({
+      ...previous,
+      builderType,
+      sizes: [],
+      options: defaultBuilderOptions(builderType),
+      designCategoryId: builderType === 'APPAREL' ? previous.designCategoryId : '',
     }))
   }
   const submit = async (event) => {
@@ -120,8 +152,10 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
           setError(validationError.message)
           return
         }
+        // removeBackground only matters for a new upload; false keeps fine logos untouched.
+        if (isSubCategory && selectedFile) fields.removeBackground = removeBackground
         const payload = imageFormData(fields, selectedFile)
-        const options = { timeout: isSubCategory && selectedFile ? 120000 : 15000 }
+        const options = { timeout: selectedFile ? 120000 : 15000 }
         if (action.mode === 'create') saved = await api.post(endpoint, payload, options)
         else
           saved = await api.patch(`${endpoint}/${encodeURIComponent(action.id)}`, payload, options)
@@ -169,9 +203,30 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
           ['Color', record?.color],
           ['Type', record?.type],
           ['Price (cents)', record?.price],
-          ['Stock', record?.stock],
+          ['Stock', record?.trackStock === false ? 'Unlimited (printed design)' : record?.stock],
         ]
-      : []),
+      : [
+          ['Builder type', builderLabels[record?.builderType] || 'Not configured'],
+          [
+            'Configuration',
+            record?.builderType === 'JEWELRY'
+              ? `${record?.sizes?.length || 0} sizes`
+              : record?.options?.length
+                ? `${record.options.length} options`
+                : 'Not configured',
+          ],
+          ...(record?.builderType === 'APPAREL'
+            ? [
+                [
+                  'Design library',
+                  record?.designCategoryId
+                    ? categories.find((category) => category.id === record.designCategoryId)
+                        ?.name || 'Unavailable category'
+                    : 'None',
+                ],
+              ]
+            : []),
+        ]),
     ['Description', record?.description],
     ['Image URL', record?.imageUrl],
     ['Status', record?.isActive ? 'Active' : 'Inactive'],
@@ -220,7 +275,7 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                   <ProductImage
                     src={record?.imageUrl}
                     name={record?.name}
-                    transparent={isSubCategory}
+                    transparent
                     large
                   />
                   <dl className="hm-catalog-details">
@@ -235,7 +290,15 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                       </div>
                     ))}
                   </dl>
-                  {!isSubCategory && (
+                  {isSubCategory && record?.originalImageUrl && (
+                    <p className="mb-0">
+                      <strong>Production file:</strong>{' '}
+                      <a href={record.originalImageUrl} target="_blank" rel="noopener noreferrer" download>
+                        Download original upload
+                      </a>
+                    </p>
+                  )}
+                  {!isSubCategory && record?.builderType === 'JEWELRY' && (
                     <section className="mt-4">
                       <h3>Sizes</h3>
                       {record?.sizes?.length ? (
@@ -306,6 +369,52 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                     )}
                     {input('name', 'Name', { required: true, maxLength: 200 })}
                     {input('sortOrder', 'Sort order', integer)}
+                    {!isSubCategory && (
+                      <CCol xs={12} md={6}>
+                        <CFormLabel htmlFor="catalog-builderType">Builder Type</CFormLabel>
+                        <CFormSelect
+                          id="catalog-builderType"
+                          name="builderType"
+                          value={form.builderType}
+                          onChange={changeBuilderType}
+                        >
+                          <option value="">Not configured</option>
+                          {Object.entries(builderLabels).map(([value, label]) => (
+                            <option value={value} key={value}>{label}</option>
+                          ))}
+                        </CFormSelect>
+                      </CCol>
+                    )}
+                    {!isSubCategory && form.builderType === 'APPAREL' && (
+                      <CCol xs={12}>
+                        <CFormLabel htmlFor="catalog-designCategoryId">Design library</CFormLabel>
+                        <CFormSelect
+                          id="catalog-designCategoryId"
+                          name="designCategoryId"
+                          value={form.designCategoryId}
+                          onChange={change}
+                          aria-describedby="catalog-designCategoryId-help"
+                        >
+                          <option value="">None</option>
+                          {categories
+                            // A library cannot be this category or itself use a library.
+                            .filter(
+                              (category) =>
+                                category.id !== action.id &&
+                                (!category.designCategoryId || category.id === form.designCategoryId),
+                            )
+                            .map((category) => (
+                              <option key={category.id} value={category.id}>
+                                {category.name}
+                              </option>
+                            ))}
+                        </CFormSelect>
+                        <small id="catalog-designCategoryId-help" className="hm-muted">
+                          Also offer the designs of this category, e.g. a shared Apparel Designs
+                          category for Hoodies and T-Shirts.
+                        </small>
+                      </CCol>
+                    )}
                     <CCol xs={12}>
                       <CFormLabel htmlFor="catalog-description">Description</CFormLabel>
                       <CFormTextarea
@@ -323,15 +432,84 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                         onChange={setSelectedFile}
                         imageUrl={record?.imageUrl}
                         name={form.name}
-                        processBackground={isSubCategory}
+                        processBackground={!isSubCategory || removeBackground}
                       />
+                      {isSubCategory && selectedFile && (
+                        <CFormCheck
+                          className="mt-2"
+                          id="catalog-removeBackground"
+                          label="Remove background (turn off for fine logos and lettering)"
+                          checked={removeBackground}
+                          onChange={(event) => setRemoveBackground(event.target.checked)}
+                        />
+                      )}
+                      {isSubCategory && record?.originalImageUrl && (
+                        <p className="mt-2 mb-0">
+                      <strong>Production file:</strong>{' '}
+                      <a href={record.originalImageUrl} target="_blank" rel="noopener noreferrer" download>
+                        Download original upload
+                      </a>
+                    </p>
+                      )}
                     </CCol>
                     {isSubCategory && (
                       <>
                         {input('color', 'Color')}
-                        {input('type', 'Type')}
+                        <CCol md={6}>
+                          <CFormLabel htmlFor="catalog-typeSelect">Type</CFormLabel>
+                          <CFormSelect
+                            id="catalog-typeSelect"
+                            value={customType ? '__custom' : form.type}
+                            onChange={(event) => {
+                              const value = event.target.value
+                              setCustomType(value === '__custom')
+                              setForm((previous) => ({
+                                ...previous,
+                                type: value === '__custom' ? '' : value,
+                              }))
+                            }}
+                          >
+                            <option value="">Not specified</option>
+                            {Object.entries(designTypes).map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                            <option value="__custom">Other (free text, e.g. beads)</option>
+                          </CFormSelect>
+                          {customType && (
+                            <CFormInput
+                              className="mt-2"
+                              id="catalog-type"
+                              name="type"
+                              aria-label="Custom type"
+                              placeholder="e.g. Pendant"
+                              value={form.type}
+                              onChange={change}
+                            />
+                          )}
+                        </CCol>
                         {input('price', 'Price (cents)', integer)}
-                        {input('stock', 'Stock', integer)}
+                        {form.trackStock ? (
+                          input('stock', 'Stock', integer)
+                        ) : (
+                          <CCol md={6}>
+                            <span className="form-label d-block">Stock</span>
+                            <p className="form-control-plaintext hm-muted mb-0">
+                              Unlimited (printed on demand)
+                            </p>
+                          </CCol>
+                        )}
+                        <CCol xs={12}>
+                          <CFormCheck
+                            id="catalog-unlimited"
+                            label="Unlimited (printed design)"
+                            checked={!form.trackStock}
+                            onChange={(event) =>
+                              setForm((previous) => ({ ...previous, trackStock: !event.target.checked }))
+                            }
+                          />
+                        </CCol>
                         <CCol xs={12}>
                           <small className="hm-muted">
                             Price is entered in cents: 1500 represents 15.00.
@@ -349,10 +527,17 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                       />
                     </CCol>
                   </CRow>
-                  {!isSubCategory && (
+                  {!isSubCategory && form.builderType === 'JEWELRY' && (
                     <CategorySizesEditor
                       sizes={form.sizes}
                       onChange={(sizes) => setForm((previous) => ({ ...previous, sizes }))}
+                    />
+                  )}
+                  {!isSubCategory && ['APPAREL', 'BOUQUET', 'GIFT'].includes(form.builderType) && (
+                    <CategoryOptionsEditor
+                      builderType={form.builderType}
+                      options={form.options}
+                      onChange={(options) => setForm((previous) => ({ ...previous, options }))}
                     />
                   )}
                 </fieldset>
@@ -381,7 +566,7 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
               {saving ? (
                 <>
                   <CSpinner size="sm" aria-hidden="true" className="me-2" />
-                  {isSubCategory && selectedFile ? 'Saving and processing image...' : 'Saving...'}
+                  {selectedFile ? 'Saving and processing image...' : 'Saving...'}
                 </>
               ) : action.mode === 'delete' ? (
                 `Delete ${singular}`

@@ -19,13 +19,13 @@ export async function requestBody(request) {
   const body = {}
   for (const [key, value] of data) {
     body[key] =
-      key === 'file'
+      typeof value !== 'string'
         ? { name: value.name, type: value.type, size: value.size }
-        : ['items', 'sizes'].includes(key)
+        : ['items', 'sizes', 'options', 'frontPrintArea', 'backPrintArea'].includes(key)
           ? JSON.parse(value)
-          : key === 'isActive'
+          : ['isActive', 'trackStock', 'removeBackground'].includes(key)
             ? value === 'true'
-            : ['price', 'stock', 'sortOrder'].includes(key)
+            : ['price', 'basePrice', 'stock', 'sortOrder'].includes(key)
               ? Number(value)
               : value
   }

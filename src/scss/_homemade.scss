@@ -1381,3 +1381,297 @@ body {
 .hm-component-table .hm-product-image img {
   object-fit: contain;
 }
+
+// ---------- Garments ----------
+:root {
+  --hm-danger-soft: #fbe3e1;
+  --hm-danger-line: #d9534f;
+  --hm-warning-soft: #fdf1d8;
+  --hm-warning-line: #d4a017;
+}
+[data-coreui-theme='dark'] {
+  --hm-danger-soft: #4a2526;
+  --hm-danger-line: #e57373;
+  --hm-warning-soft: #4a3d1c;
+  --hm-warning-line: #e0b84a;
+}
+.hm-garment-drawer .modal-dialog {
+  width: min(1120px, 100%);
+}
+.hm-garment-drawer form.d-contents {
+  display: contents;
+}
+.hm-garment-drawer fieldset {
+  min-width: 0;
+}
+.hm-mockup {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background: var(--hm-surface);
+  border: 1px solid var(--hm-line);
+  border-radius: 12px;
+  overflow: hidden;
+  user-select: none;
+  touch-action: none;
+}
+.hm-mockup > img,
+.hm-mockup > .hm-garment-silhouette {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+.hm-garment-silhouette {
+  color: var(--hm-text);
+  aspect-ratio: 1;
+}
+.hm-print-area {
+  position: absolute;
+  border: 2px dashed var(--hm-gold);
+  background: rgba(182, 154, 99, 0.12);
+}
+.hm-print-area.is-editable {
+  cursor: move;
+}
+.hm-print-area.is-editable:focus-visible {
+  outline: 3px solid var(--hm-steel);
+  outline-offset: 2px;
+}
+.hm-print-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: var(--hm-surface);
+  border: 2px solid var(--hm-gold);
+  border-radius: 3px;
+}
+.hm-print-handle-nw { left: -8px; top: -8px; cursor: nwse-resize; }
+.hm-print-handle-ne { right: -8px; top: -8px; cursor: nesw-resize; }
+.hm-print-handle-sw { left: -8px; bottom: -8px; cursor: nesw-resize; }
+.hm-print-handle-se { right: -8px; bottom: -8px; cursor: nwse-resize; }
+.hm-print-editor {
+  border: 1px solid var(--hm-line);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: var(--hm-surface);
+}
+.hm-print-editor-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.hm-print-editor-heading h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+.hm-print-editor-body {
+  display: grid;
+  grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.hm-variant-block {
+  border: 1px solid var(--hm-line);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: var(--hm-surface);
+}
+.hm-variant-block h4 {
+  font-size: 1rem;
+}
+.hm-size-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  margin: 0 0 12px;
+  list-style: none;
+}
+.hm-size-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px 2px 12px;
+  border: 1px solid var(--hm-steel);
+  border-radius: 999px;
+  font-weight: 600;
+}
+.hm-size-chip span {
+  margin-right: 4px;
+}
+.hm-size-chip button,
+.hm-variant-clear {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 50%;
+  line-height: 1;
+}
+.hm-size-chip button:hover:not(:disabled),
+.hm-variant-clear:hover {
+  background: var(--hm-paper);
+}
+.hm-size-chip button:disabled {
+  opacity: 0.3;
+}
+.hm-size-input {
+  width: 140px;
+}
+.hm-swatch {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--hm-line);
+  flex-shrink: 0;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+.hm-variant-grid-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--hm-line);
+  border-radius: 12px;
+}
+.hm-variant-grid {
+  border-collapse: collapse;
+  min-width: 100%;
+  background: var(--hm-surface);
+}
+.hm-variant-grid th,
+.hm-variant-grid td {
+  border: 1px solid var(--hm-line);
+  padding: 8px;
+  vertical-align: top;
+}
+.hm-variant-grid thead th {
+  text-align: center;
+  background: var(--hm-paper);
+}
+.hm-variant-grid tbody th {
+  white-space: nowrap;
+  position: sticky;
+  left: 0;
+  background: var(--hm-surface);
+  z-index: 1;
+}
+.hm-variant-cell {
+  min-width: 150px;
+}
+.hm-variant-cell.is-sold-out {
+  background: var(--hm-danger-soft);
+  box-shadow: inset 3px 0 0 var(--hm-danger-line);
+}
+.hm-variant-cell.is-low {
+  background: var(--hm-warning-soft);
+  box-shadow: inset 3px 0 0 var(--hm-warning-line);
+}
+.hm-variant-cell-fields {
+  display: grid;
+  gap: 4px;
+}
+.hm-variant-cell-fields label {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--hm-muted);
+}
+.hm-variant-flag {
+  font-weight: 700;
+  font-size: 0.72rem;
+}
+.hm-variant-add {
+  width: 100%;
+  min-height: 44px;
+  border: 1px dashed var(--hm-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hm-muted);
+}
+.hm-variant-add:hover {
+  border-color: var(--hm-steel);
+  color: var(--hm-text);
+}
+.hm-apparel-previews {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+.hm-apparel-previews figure {
+  margin: 0;
+}
+.hm-apparel-previews figcaption {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.hm-production-meta {
+  font-weight: 600;
+}
+.hm-production-side + .hm-production-side {
+  margin-top: 24px;
+}
+.hm-production-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.hm-placed-design {
+  position: absolute;
+  height: auto;
+  transform-origin: center;
+  pointer-events: none;
+}
+.hm-production-design {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hm-production-design img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+@media (max-width: 767px) {
+  .hm-print-editor-body,
+  .hm-production-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media print {
+  body.hm-printing-production * {
+    visibility: hidden;
+  }
+  body.hm-printing-production .hm-production-sheet,
+  body.hm-printing-production .hm-production-sheet * {
+    visibility: visible;
+  }
+  body.hm-printing-production .modal,
+  body.hm-printing-production .modal-dialog,
+  body.hm-printing-production .modal-content,
+  body.hm-printing-production .modal-body {
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    transform: none !important;
+  }
+  body.hm-printing-production .hm-production-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: 0;
+  }
+  body.hm-printing-production .hm-no-print {
+    display: none !important;
+  }
+}

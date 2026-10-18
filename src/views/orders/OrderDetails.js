@@ -21,6 +21,7 @@ import DesignPreview from '../products/DesignPreview'
 import ComponentTable from '../products/ComponentTable'
 import { formatPrice } from '../products/productHelpers'
 import OrderBadge from './OrderBadge'
+import ProductionSheet from './ProductionSheet'
 import {
   nextStatus,
   orderDate,
@@ -153,6 +154,7 @@ const OrderDetails = ({ id, initialDelete = false, onClose, onChanged, onDeleted
   const next = nextStatus(order?.status)
   const product = orderedProduct(order)
   const readyMade = product?.productType === 'READY_MADE'
+  const variant = product?.garmentVariant
   return (
     <CModal
       visible
@@ -253,24 +255,55 @@ const OrderDetails = ({ id, initialDelete = false, onClose, onChanged, onDeleted
                 <p className="hm-order-text">
                   {product?.description || 'No description provided.'}
                 </p>
-                <DesignPreview
-                  src={orderDesignImage(order)}
-                  name={product?.name}
-                  readyMade={readyMade}
-                  large
-                />
+                {variant ? (
+                  <div className="hm-apparel-previews">
+                    <figure>
+                      <figcaption>Front</figcaption>
+                      <DesignPreview src={orderDesignImage(order)} name={`${product?.name || 'Design'} front`} large />
+                    </figure>
+                    {product?.backDesignPreviewUrl && (
+                      <figure>
+                        <figcaption>Back</figcaption>
+                        <DesignPreview src={product.backDesignPreviewUrl} name={`${product?.name || 'Design'} back`} large />
+                      </figure>
+                    )}
+                  </div>
+                ) : (
+                  <DesignPreview
+                    src={orderDesignImage(order)}
+                    name={product?.name}
+                    readyMade={readyMade}
+                    large
+                  />
+                )}
+                {variant && (
+                  <Facts
+                    entries={[
+                      ['Garment', variant.garment?.name],
+                      [
+                        'Colour',
+                        <span className="d-inline-flex align-items-center gap-2" key="colour">
+                          <span className="hm-swatch" style={{ backgroundColor: variant.colorValue }} aria-hidden="true" />
+                          {variant.colorName}
+                        </span>,
+                      ],
+                      ['Size', variant.size],
+                      ['SKU', variant.sku],
+                    ]}
+                  />
+                )}
                 <Facts
                   entries={[
                     ['Product type', orderProductLabel(order)],
                     ['Category', product?.category?.name],
-                    [
+                    ...(variant ? [] : [[
                       'Purchased size',
                       product?.selectedSize
                         ? `${product.selectedSize.name} · ${product.selectedSize.measurement} ${product.selectedSize.unit}`
                         : 'Size not recorded',
-                    ],
+                    ]]),
                     [
-                      readyMade ? 'Quantity' : 'Bead count',
+                      readyMade ? 'Quantity' : variant ? 'Designs' : 'Bead count',
                       readyMade ? '1 finished product' : `${product?.itemCount ?? 0} items`,
                     ],
                   ]}
@@ -280,7 +313,9 @@ const OrderDetails = ({ id, initialDelete = false, onClose, onChanged, onDeleted
                 )}
                 {(!readyMade || product?.items?.length > 0) && (
                   <>
-                    <h4>{readyMade ? 'Included materials' : 'Components / materials'}</h4>
+                    <h4>
+                      {readyMade ? 'Included materials' : variant ? 'Designs' : 'Components / materials'}
+                    </h4>
                     <ComponentTable items={product?.items} />
                   </>
                 )}
@@ -289,6 +324,7 @@ const OrderDetails = ({ id, initialDelete = false, onClose, onChanged, onDeleted
                   <strong>{formatPrice(order.totalPrice)}</strong>
                 </div>
               </section>
+              <ProductionSheet product={product} orderNumber={order.orderNumber} />
               <section className="hm-order-section">
                 <h3>Customer notes</h3>
                 <p className="hm-order-text">{order.customerNotes || 'No customer notes.'}</p>

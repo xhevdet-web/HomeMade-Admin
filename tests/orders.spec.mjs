@@ -841,3 +841,96 @@ test('versioned custom-design snapshot restores product name, preview and compon
     product.designPreviewUrl,
   )
 })
+
+const apparelProduct = (garment) => ({
+  ...product,
+  productType: 'CUSTOM_DESIGN',
+  name: 'Team hoodie',
+  designPreviewUrl: 'https://images.example.test/front-preview.png',
+  backDesignPreviewUrl: 'https://images.example.test/back-preview.png',
+  garmentVariant: {
+    id: 'variant',
+    size: 'M',
+    colorName: 'Red',
+    colorValue: '#C0392B',
+    sku: 'HOOD-RED-M',
+    garment,
+  },
+  items: [
+    {
+      id: 'placed',
+      subCategoryId: 'logo',
+      quantity: 1,
+      position: 0,
+      unitPrice: 500,
+      side: 'FRONT',
+      x: 0.5,
+      y: 0.25,
+      scale: 1,
+      rotation: 15,
+      subCategory: {
+        id: 'logo',
+        name: 'Star logo',
+        price: 500,
+        imageUrl: 'https://images.example.test/star.png',
+        originalImageUrl: 'https://images.example.test/star-original.png',
+      },
+    },
+  ],
+})
+
+test('apparel orders show the garment variant, both previews and a production sheet in centimetres', async ({
+  page,
+}) => {
+  const saved = apparelProduct({
+    id: 'garment',
+    name: 'Classic Hoodie',
+    frontImageUrl: null,
+    backImageUrl: null,
+    silhouette: 'HOODIE',
+    frontPrintArea: { x: 0.3, y: 0.28, width: 0.4, height: 0.42, widthCm: 30, heightCm: 40 },
+    backPrintArea: null,
+  })
+  await setup(page, {
+    orders: [{ ...makeOrder(0), designSnapshot: { version: 1, product: saved, ownedImageKeys: [] }, product: saved }],
+  })
+  await page.goto('/#/orders')
+  await openFirst(page)
+  const design = dialog(page).locator('.hm-customer-design')
+  await expect(design).toContainText('Classic Hoodie')
+  await expect(design).toContainText('Red')
+  await expect(design).toContainText('HOOD-RED-M')
+  await expect(design.getByRole('img', { name: 'Team hoodie back customer design' })).toHaveAttribute(
+    'src',
+    'https://images.example.test/back-preview.png',
+  )
+  const sheet = dialog(page).locator('.hm-production-sheet')
+  await expect(sheet).toContainText('HM-2026-000001 · Classic Hoodie · Red / M · SKU HOOD-RED-M')
+  // width = 1 × 0.5 × 30, left = 0.5 × 30, top = 0.25 × 40
+  await expect(sheet.getByRole('row').filter({ hasText: 'Star logo' })).toContainText(
+    '15.0 cm15.0 cm10.0 cm15°',
+  )
+  await expect(sheet.getByRole('img', { name: 'Star logo placement 1' })).toHaveAttribute(
+    'src',
+    'https://images.example.test/star-original.png',
+  )
+  await expect(sheet.getByRole('link', { name: 'Production file' })).toHaveAttribute(
+    'href',
+    'https://images.example.test/star-original.png',
+  )
+  await expect(sheet.getByRole('button', { name: 'Print production sheet' })).toBeVisible()
+  await expect(sheet).not.toContainText('placed before print areas were saved')
+})
+
+test('older apparel snapshots without print areas warn and fall back to the current garment', async ({
+  page,
+}) => {
+  const saved = apparelProduct({ id: 'garment-gone', name: 'Classic Hoodie', imageUrl: null })
+  await setup(page, { orders: [{ ...makeOrder(0), product: saved }] })
+  await page.goto('/#/orders')
+  await openFirst(page)
+  const sheet = dialog(page).locator('.hm-production-sheet')
+  await expect(sheet).toContainText('placed before print areas were saved')
+  await expect(sheet).toContainText('Unable to load the current garment; showing default areas.')
+  await expect(sheet).toContainText('No front print area was saved; using the default area.')
+})
