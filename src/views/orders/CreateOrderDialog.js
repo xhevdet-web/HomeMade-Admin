@@ -24,6 +24,7 @@ const CreateOrderDialog = ({ onClose, onCreated }) => {
   const { userData } = useAuthSelector()
   const [products, setProducts] = useState([])
   const [productId, setProductId] = useState('')
+  const [size, setSize] = useState('')
   const [paymentType, setPaymentType] = useState('CASH_ON_DELIVERY')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(true)
@@ -38,6 +39,8 @@ const CreateOrderDialog = ({ onClose, onCreated }) => {
     userData?.[key]?.trim(),
   )
   const selected = products.find((product) => product.id === productId)
+  // A company product sold in sizes is ordered in one size, with that size's stock.
+  const sizes = selected?.origin === 'COMPANY' && Array.isArray(selected.sizes) ? selected.sizes : []
   useEffect(() => {
     const controller = new AbortController()
     setLoading(true)
@@ -89,6 +92,7 @@ const CreateOrderDialog = ({ onClose, onCreated }) => {
     try {
       const { data } = await api.post('/orders', {
         productId,
+        ...(sizes.length ? { size } : {}),
         paymentType,
         customerNotes: notes.trim() || null,
       })
@@ -176,7 +180,10 @@ const CreateOrderDialog = ({ onClose, onCreated }) => {
               <CFormSelect
                 id="order-product"
                 value={productId}
-                onChange={(event) => setProductId(event.target.value)}
+                onChange={(event) => {
+                  setProductId(event.target.value)
+                  setSize('')
+                }}
                 required
                 className="mb-3"
               >
@@ -188,6 +195,25 @@ const CreateOrderDialog = ({ onClose, onCreated }) => {
                 ))}
               </CFormSelect>
               {!products.length && <p>No products are available. Add a product first.</p>}
+              {sizes.length > 0 && (
+                <>
+                  <CFormLabel htmlFor="order-size">Size</CFormLabel>
+                  <CFormSelect
+                    id="order-size"
+                    value={size}
+                    onChange={(event) => setSize(event.target.value)}
+                    required
+                    className="mb-3"
+                  >
+                    <option value="">Select a size</option>
+                    {sizes.map((entry) => (
+                      <option key={entry.size} value={entry.size} disabled={entry.stock < 1}>
+                        {entry.size} - {entry.stock < 1 ? 'sold out' : `${entry.stock} available`}
+                      </option>
+                    ))}
+                  </CFormSelect>
+                </>
+              )}
               {selected && (
                 <div className="hm-order-product-summary">
                   <ProductImage src={selected.imageUrl} name={selected.name} />
@@ -281,7 +307,14 @@ const CreateOrderDialog = ({ onClose, onCreated }) => {
           <CButton
             type="submit"
             color="primary"
-            disabled={saving || loading || !!loadError || !selected || !profileComplete}
+            disabled={
+              saving ||
+              loading ||
+              !!loadError ||
+              !selected ||
+              !profileComplete ||
+              (sizes.length > 0 && !size)
+            }
           >
             {saving ? 'Placing order...' : 'Place Order'}
           </CButton>

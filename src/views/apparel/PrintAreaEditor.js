@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import PropTypes from 'prop-types'
 import { CCol, CFormCheck, CFormInput, CFormLabel, CRow } from '@coreui/react'
 import GarmentSilhouette from './GarmentSilhouette'
-import { clampArea, defaultPrintArea } from './garmentHelpers'
+import { clampArea, defaultPrintArea } from './apparelHelpers'
 
 const handles = ['nw', 'ne', 'sw', 'se']
 const percent = (value) => Math.round(Number(value) * 1000) / 10

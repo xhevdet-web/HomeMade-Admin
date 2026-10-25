@@ -14,7 +14,7 @@ export const imageFormData = (fields, file) => {
     if (value !== undefined)
       data.append(
         key,
-        ['items', 'sizes', 'options'].includes(key) ? JSON.stringify(value) : String(value ?? ''),
+        ['items', 'sizes', 'builderConfig', 'printAreas'].includes(key) ? JSON.stringify(value) : String(value ?? ''),
       )
   })
   if (file) data.append('file', file)

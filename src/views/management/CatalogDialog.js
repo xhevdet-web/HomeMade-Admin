@@ -23,16 +23,10 @@ import api, { apiErrorMessage } from '../../_helpers/api'
 import ProductImage from '../products/ProductImage'
 import ImagePicker from '../../components/ImagePicker'
 import { imageFormData } from '../../_helpers/imageUpload'
-import {
-  catalogConfig,
-  catalogPayload,
-  defaultBuilderOptions,
-  emptyCatalogForm,
-} from './catalogFields'
+import { catalogConfig, catalogPayload, categoryForm, emptyCatalogForm, typesFor } from './catalogFields'
 import CategorySizesEditor from './CategorySizesEditor'
-import CategoryOptionsEditor from './CategoryOptionsEditor'
 import { builderLabels } from './catalogFields'
-import { designTypes } from '../garments/garmentHelpers'
+import { silhouettes } from '../apparel/apparelHelpers'
 
 const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
   const { singular, endpoint } = catalogConfig[kind]
@@ -76,13 +70,11 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
           throw new Error('Invalid detail response')
         setRecord(data)
         setCategories(optionsResponse?.data || [])
-        const nextForm = Object.fromEntries(
-            Object.entries(emptyCatalogForm).map(([key, fallback]) => [
-              key,
-              data?.[key] ?? fallback,
-            ]),
-          )
-        setCustomType(!!nextForm.type && !designTypes[nextForm.type])
+        const nextForm = categoryForm(data)
+        const builder = (optionsResponse?.data || []).find(
+          (category) => category.id === nextForm.categoryId,
+        )?.builderType
+        setCustomType(!!nextForm.type && !typesFor(builder)[nextForm.type])
         setForm(nextForm)
       })
       .catch((error) => {
@@ -104,11 +96,7 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
   }
   const changeBuilderType = (event) => {
     const builderType = event.target.value
-    const hasConfiguration =
-      form.sizes?.length > 0 ||
-      form.options?.some(
-        (option) => option.values?.length > 0 || ['number', 'text'].includes(option.type),
-      )
+    const hasConfiguration = form.sizes?.length > 0
     if (
       builderType !== form.builderType &&
       hasConfiguration &&
@@ -119,7 +107,7 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
       ...previous,
       builderType,
       sizes: [],
-      options: defaultBuilderOptions(builderType),
+      silhouette: builderType === 'APPAREL' ? previous.silhouette || 'HOODIE' : '',
       designCategoryId: builderType === 'APPAREL' ? previous.designCategoryId : '',
     }))
   }
@@ -194,6 +182,11 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
     step: 1,
     required: true,
   }
+  const componentTypes = typesFor(
+    categories.find((category) => category.id === form.categoryId)?.builderType,
+  )
+  // A saved type outside the category's choices is shown as free text.
+  const showCustomType = customType || (!!form.type && !componentTypes[form.type])
   const title = `${action.mode === 'view' ? '' : action.mode === 'create' ? 'Create ' : action.mode === 'edit' ? 'Edit ' : 'Delete '}${singular}${action.mode === 'view' ? ' details' : ''}`
   const fields = [
     ['Name', record?.name],
@@ -211,8 +204,8 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
             'Configuration',
             record?.builderType === 'JEWELRY'
               ? `${record?.sizes?.length || 0} sizes`
-              : record?.options?.length
-                ? `${record.options.length} options`
+              : record?.builderType === 'APPAREL'
+                ? `${silhouettes[record?.builderConfig?.silhouette] || 'No'} silhouette · colours and sizes per product`
                 : 'Not configured',
           ],
           ...(record?.builderType === 'APPAREL'
@@ -386,6 +379,29 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                       </CCol>
                     )}
                     {!isSubCategory && form.builderType === 'APPAREL' && (
+                      <CCol xs={12} md={6}>
+                        <CFormLabel htmlFor="catalog-silhouette">Garment shape</CFormLabel>
+                        <CFormSelect
+                          id="catalog-silhouette"
+                          name="silhouette"
+                          value={form.silhouette}
+                          onChange={change}
+                          aria-describedby="catalog-silhouette-help"
+                        >
+                          <option value="">None</option>
+                          {Object.entries(silhouettes).map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </CFormSelect>
+                        <small id="catalog-silhouette-help" className="hm-muted">
+                          Drawn in the studio until a product has its own image. Colours, sizes
+                          and stock are set on each product.
+                        </small>
+                      </CCol>
+                    )}
+                    {!isSubCategory && form.builderType === 'APPAREL' && (
                       <CCol xs={12}>
                         <CFormLabel htmlFor="catalog-designCategoryId">Design library</CFormLabel>
                         <CFormSelect
@@ -456,10 +472,11 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                       <>
                         {input('color', 'Color')}
                         <CCol md={6}>
+                          {/* Choices follow the category's studio, e.g. Wrapping for bouquets. */}
                           <CFormLabel htmlFor="catalog-typeSelect">Type</CFormLabel>
                           <CFormSelect
                             id="catalog-typeSelect"
-                            value={customType ? '__custom' : form.type}
+                            value={showCustomType ? '__custom' : form.type}
                             onChange={(event) => {
                               const value = event.target.value
                               setCustomType(value === '__custom')
@@ -470,14 +487,14 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                             }}
                           >
                             <option value="">Not specified</option>
-                            {Object.entries(designTypes).map(([value, label]) => (
+                            {Object.entries(componentTypes).map(([value, label]) => (
                               <option key={value} value={value}>
                                 {label}
                               </option>
                             ))}
                             <option value="__custom">Other (free text, e.g. beads)</option>
                           </CFormSelect>
-                          {customType && (
+                          {showCustomType && (
                             <CFormInput
                               className="mt-2"
                               id="catalog-type"
@@ -531,13 +548,6 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                     <CategorySizesEditor
                       sizes={form.sizes}
                       onChange={(sizes) => setForm((previous) => ({ ...previous, sizes }))}
-                    />
-                  )}
-                  {!isSubCategory && ['APPAREL', 'BOUQUET', 'GIFT'].includes(form.builderType) && (
-                    <CategoryOptionsEditor
-                      builderType={form.builderType}
-                      options={form.options}
-                      onChange={(options) => setForm((previous) => ({ ...previous, options }))}
                     />
                   )}
                 </fieldset>

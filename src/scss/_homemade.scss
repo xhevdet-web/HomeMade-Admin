@@ -1630,6 +1630,45 @@ body {
   transform-origin: center;
   pointer-events: none;
 }
+// Printed text on the production mockup: a visual guide; the table has exact sizes.
+.hm-placed-text {
+  position: absolute;
+  transform-origin: center;
+  pointer-events: none;
+  text-align: center;
+  font-size: 0.8rem;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+// Customer uploads, shown on a checkerboard so transparent PNG areas are visible.
+.hm-artwork-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+.hm-artwork {
+  margin: 0;
+}
+.hm-artwork-image {
+  display: block;
+  aspect-ratio: 1;
+  margin-bottom: 8px;
+  border: 1px solid var(--hm-line);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: var(--hm-paper);
+  background-image: linear-gradient(45deg, var(--hm-line) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--hm-line) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--hm-line) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--hm-line) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+.hm-artwork-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 .hm-production-design {
   display: flex;
   align-items: center;

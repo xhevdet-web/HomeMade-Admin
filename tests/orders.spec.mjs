@@ -131,7 +131,18 @@ async function setup(page, overrides = {}) {
       return state.userError
         ? fulfill(route, { message: 'Customer lookup unavailable' }, 503)
         : fulfill(route, [customer, admin])
-    if (path === '/products') return fulfill(route, [product])
+    if (path === '/categories')
+      return fulfill(route, [
+        { id: 'category', name: 'Necklaces' },
+        { id: 'hoodies', name: 'Hoodies' },
+      ])
+    if (path === '/products')
+      return fulfill(
+        route,
+        url.searchParams.get('categoryId') === 'hoodies'
+          ? [{ ...product, id: 'black-hoodie', name: 'Black Essential Hoodie', origin: 'COMPANY' }]
+          : [product],
+      )
     if (path === '/sub-categories')
       return fulfill(route, [{ id: 'sub', name: 'Pearls', stock: 26 }])
     if (path === '/categories/category/sub-categories')
@@ -678,12 +689,12 @@ test('order design is prominent with saved materials and historical total throug
   )
 })
 
-test('ready-made orders show the purchased product image in list and detail with legacy fallback', async ({
+test('company product orders show the purchased product image in list and detail', async ({
   page,
 }) => {
   const purchased = {
     ...product,
-    productType: 'READY_MADE',
+    origin: 'COMPANY',
     designPreviewUrl: null,
     imageUrl: 'https://images.example.test/purchased-bracelet.png',
     items: [],
@@ -692,12 +703,8 @@ test('ready-made orders show the purchased product image in list and detail with
   const order = {
     ...makeOrder(0),
     designPreviewUrl: null,
-    designSnapshot: { version: 1, product: purchased, ownedImageKeys: [] },
-    product: {
-      ...purchased,
-      name: 'Changed catalog name',
-      imageUrl: 'https://images.example.test/changed.png',
-    },
+    designSnapshot: { version: 2, product: purchased, ownedImageKeys: [] },
+    product: purchased,
   }
   const state = await setup(page, { orders: [order] })
   await page.goto('/#/orders')
@@ -705,11 +712,11 @@ test('ready-made orders show the purchased product image in list and detail with
   await expect(thumbnail).toHaveAttribute('src', purchased.imageUrl)
   const row = page.getByRole('row').filter({ hasText: 'HM-2026-000001' })
   await expect(row).toContainText(product.name)
-  await expect(row).toContainText('Ready-made product')
+  await expect(row).toContainText('Company product')
   await expect(row).not.toContainText('Unavailable product')
   await openFirst(page)
   const design = dialog(page).locator('.hm-customer-design')
-  await expect(design).toContainText('READY-MADE PRODUCT')
+  await expect(design).toContainText('COMPANY PRODUCT')
   await expect(design.getByRole('heading', { name: product.name })).toBeVisible()
   await expect(design.locator('.hm-design-preview-large img')).toHaveAttribute(
     'src',
@@ -722,13 +729,10 @@ test('ready-made orders show the purchased product image in list and detail with
   await expect(design).not.toContainText('Components / materials')
   await expect(design.locator('.hm-design-total')).toContainText('\u20ac29.99')
   await expect(design).toContainText('1 finished product')
-  await expect(dialog(page).getByRole('heading', { name: 'Product', exact: true })).toHaveCount(0)
-  await page.screenshot({ path: 'test-results/ready-made-order-details.png' })
+  await page.screenshot({ path: 'test-results/company-order-details.png' })
   await dialog(page).getByRole('button', { name: 'Close', exact: true }).click()
-  state.orders[0] = { ...order, designSnapshot: null, product: purchased }
-  await page.getByRole('button', { name: 'Refresh orders', exact: true }).click()
-  await expect(thumbnail).toHaveAttribute('src', purchased.imageUrl)
-  state.orders[0].product.imageUrl = 'https://images.example.test/broken.png'
+  state.orders[0] = { ...order, designSnapshot: null }
+  state.orders[0].product = { ...purchased, imageUrl: 'https://images.example.test/broken.png' }
   await page.route('https://images.example.test/broken.png', (route) => route.abort())
   await page.getByRole('button', { name: 'Refresh orders', exact: true }).click()
   await expect(thumbnail).toHaveAttribute('src', /(?:catalog-placeholder|^data:image\/svg\+xml)/)
@@ -736,6 +740,37 @@ test('ready-made orders show the purchased product image in list and detail with
   await expect(dialog(page).locator('.hm-customer-design')).toContainText(
     'Product image unavailable',
   )
+})
+
+test('orders filter by category, product and origin on the server', async ({ page }) => {
+  const state = await setup(page)
+  await page.goto('/#/orders')
+  await expect(page.getByLabel('Product', { exact: true })).toBeDisabled()
+  await page.getByLabel('Category', { exact: true }).selectOption('hoodies')
+  const productFilter = page.getByLabel('Product', { exact: true })
+  await expect(productFilter).toBeEnabled()
+  await expect(productFilter.locator('option')).toHaveText([
+    'All products',
+    'Black Essential Hoodie',
+  ])
+  expect(
+    state.requests.some(
+      (r) => r.path === '/products' && r.query.categoryId === 'hoodies' && r.query.origin === 'COMPANY',
+    ),
+  ).toBe(true)
+  await productFilter.selectOption('black-hoodie')
+  await page.getByLabel('Origin', { exact: true }).selectOption('CUSTOMER')
+  await page.getByRole('button', { name: 'Apply filters' }).click()
+  await expect
+    .poll(() => state.requests.filter((r) => r.path === '/orders' && r.method === 'GET').at(-1).query)
+    .toMatchObject({ categoryId: 'hoodies', productId: 'black-hoodie', origin: 'CUSTOMER', page: '1' })
+  // A product belongs to one category: changing the category clears it.
+  await page.getByLabel('Category', { exact: true }).selectOption('category')
+  await expect(productFilter).toHaveValue('')
+  await page.getByRole('button', { name: 'Clear filters' }).click()
+  await expect
+    .poll(() => state.requests.filter((r) => r.path === '/orders' && r.method === 'GET').at(-1).query)
+    .toEqual({ page: '1', limit: '20' })
 })
 
 test('order design fallback uses bundled image and never falls back to the catalog image', async ({
@@ -756,58 +791,43 @@ test('order design fallback uses bundled image and never falls back to the catal
   await expect(dialog(page).getByRole('heading', { name: 'Product', exact: true })).toHaveCount(0)
 })
 
-for (const productType of ['CUSTOM_DESIGN', 'READY_MADE']) {
-  test(`${productType} order details show the purchased size rather than current category sizes`, async ({
-    page,
-  }) => {
-    const selectedSize = { id: 'medium', name: 'Medium', measurement: 18, unit: 'cm', maxItems: 18 }
-    const purchased = { ...product, productType, selectedSize }
+for (const [origin, selectedSize, label] of [
+  ['CUSTOMER', { id: 'medium', name: 'Medium', measurement: 18, unit: 'cm', maxItems: 18 }, 'Medium · 18 cm'],
+  ['COMPANY', { id: 'L', name: 'L' }, 'L'],
+]) {
+  test(`${origin} order details show the purchased size`, async ({ page }) => {
+    const purchased = { ...product, origin, selectedSize }
     await setup(page, {
       orders: [
         {
           ...makeOrder(0),
-          designSnapshot: { version: 1, product: purchased, ownedImageKeys: [] },
-          product: {
-            ...purchased,
-            selectedSize: { ...selectedSize, name: 'Large', measurement: 22 },
-          },
+          designSnapshot: { version: 2, product: purchased, ownedImageKeys: [] },
+          product: purchased,
         },
       ],
     })
     await page.goto('/#/orders')
+    await expect(page.getByRole('row').filter({ hasText: 'HM-2026-000001' })).toContainText(
+      `Size ${selectedSize.name}`,
+    )
     await openFirst(page)
     await expect(
       dialog(page).locator('.hm-order-facts').filter({ hasText: 'Purchased size' }),
-    ).toContainText('Medium · 18 cm')
-    await expect(dialog(page).locator('.hm-customer-design')).not.toContainText('Large · 22 cm')
+    ).toContainText(label)
   })
 }
 
-test('null and older snapshots show Size not recorded without inferring current sizes', async ({
-  page,
-}) => {
-  const selectedSize = { id: 'medium', name: 'Medium', measurement: 18, unit: 'cm', maxItems: 18 }
-  const current = {
-    ...product,
-    selectedSize,
-    category: { ...product.category, sizes: [selectedSize] },
-  }
+test('orders without a recorded size say so', async ({ page }) => {
   await setup(page, {
     orders: [
-      { ...makeOrder(0), product: { ...current, selectedSize: null } },
-      {
-        ...makeOrder(1),
-        product: current,
-        designSnapshot: { version: 1, product: { ...product, selectedSize: null } },
-      },
-      { ...makeOrder(2), product: current, designSnapshot: { version: 1, product } },
+      { ...makeOrder(0), product: { ...product, selectedSize: null } },
+      { ...makeOrder(1), product },
     ],
   })
   await page.goto('/#/orders')
-  for (const number of ['000001', '000002', '000003']) {
+  for (const number of ['000001', '000002']) {
     await page.getByRole('button', { name: `View details HM-2026-${number}`, exact: true }).click()
     await expect(dialog(page).locator('.hm-customer-design')).toContainText('Size not recorded')
-    await expect(dialog(page).locator('.hm-customer-design')).not.toContainText('Medium · 18 cm')
     await dialog(page).getByRole('button', { name: 'Close', exact: true }).click()
     await expect(dialog(page)).toHaveCount(0)
   }
@@ -816,22 +836,21 @@ test('null and older snapshots show Size not recorded without inferring current 
 test('versioned custom-design snapshot restores product name, preview and component details', async ({
   page,
 }) => {
-  const saved = { ...product, productType: 'CUSTOM_DESIGN', name: 'Ordered custom necklace' }
+  const saved = { ...product, origin: 'CUSTOMER', name: 'Ordered custom necklace' }
   await setup(page, {
     orders: [
       {
         ...makeOrder(0),
-        designSnapshot: { version: 1, product: saved, ownedImageKeys: [] },
-        product: { ...product, name: 'Changed catalog name', itemCount: 1, items: [] },
+        designSnapshot: { version: 2, product: saved, ownedImageKeys: [] },
+        product: saved,
       },
     ],
   })
   await page.goto('/#/orders')
   const row = page.getByRole('row').filter({ hasText: 'HM-2026-000001' })
   await expect(row).toContainText('Ordered custom necklace')
-  await expect(row).toContainText('Custom design')
-  await expect(row).toContainText('24 beads')
-  await expect(row).not.toContainText('Changed catalog name')
+  await expect(row).toContainText('Customer design')
+  await expect(row).toContainText('24 components')
   await openFirst(page)
   await expect(dialog(page).getByRole('heading', { name: 'Ordered custom necklace' })).toBeVisible()
   await expect(dialog(page).locator('.hm-customer-design')).toContainText('Components / materials')
@@ -842,20 +861,16 @@ test('versioned custom-design snapshot restores product name, preview and compon
   )
 })
 
-const apparelProduct = (garment) => ({
+// A customer design printed on a company hoodie, as the API returns it with the order.
+const apparelProduct = (baseProduct) => ({
   ...product,
-  productType: 'CUSTOM_DESIGN',
+  origin: 'CUSTOMER',
   name: 'Team hoodie',
   designPreviewUrl: 'https://images.example.test/front-preview.png',
   backDesignPreviewUrl: 'https://images.example.test/back-preview.png',
-  garmentVariant: {
-    id: 'variant',
-    size: 'M',
-    colorName: 'Red',
-    colorValue: '#C0392B',
-    sku: 'HOOD-RED-M',
-    garment,
-  },
+  category: { ...product.category, name: 'Hoodies', builderConfig: { silhouette: 'HOODIE' } },
+  baseProduct,
+  selectedSize: { id: 'M', name: 'M' },
   items: [
     {
       id: 'placed',
@@ -879,33 +894,37 @@ const apparelProduct = (garment) => ({
   ],
 })
 
-test('apparel orders show the garment variant, both previews and a production sheet in centimetres', async ({
+test('apparel orders show the base product, size, both previews and a production sheet in centimetres', async ({
   page,
 }) => {
   const saved = apparelProduct({
-    id: 'garment',
-    name: 'Classic Hoodie',
-    frontImageUrl: null,
+    id: 'black-hoodie',
+    name: 'Black Essential Hoodie',
+    color: 'Black',
+    colorHex: '#111111',
+    imageUrl: null,
     backImageUrl: null,
-    silhouette: 'HOODIE',
-    frontPrintArea: { x: 0.3, y: 0.28, width: 0.4, height: 0.42, widthCm: 30, heightCm: 40 },
-    backPrintArea: null,
+    printAreas: { front: { x: 0.3, y: 0.28, width: 0.4, height: 0.42, widthCm: 30, heightCm: 40 } },
   })
+  saved.textLayers = [
+    { id: 't1', text: 'Kate', x: 0.5, y: 0.75, scale: 1, rotation: 0, side: 'FRONT', font: 'SCRIPT', color: '#C0392B' },
+  ]
   await setup(page, {
-    orders: [{ ...makeOrder(0), designSnapshot: { version: 1, product: saved, ownedImageKeys: [] }, product: saved }],
+    orders: [{ ...makeOrder(0), designSnapshot: { version: 2, product: saved, ownedImageKeys: [] }, product: saved }],
   })
   await page.goto('/#/orders')
   await openFirst(page)
   const design = dialog(page).locator('.hm-customer-design')
-  await expect(design).toContainText('Classic Hoodie')
-  await expect(design).toContainText('Red')
-  await expect(design).toContainText('HOOD-RED-M')
+  await expect(design).toContainText('Made on')
+  await expect(design).toContainText('Black Essential Hoodie')
+  await expect(design).toContainText('Black')
+  await expect(design.locator('.hm-order-facts').filter({ hasText: 'Purchased size' })).toContainText('M')
   await expect(design.getByRole('img', { name: 'Team hoodie back customer design' })).toHaveAttribute(
     'src',
     'https://images.example.test/back-preview.png',
   )
   const sheet = dialog(page).locator('.hm-production-sheet')
-  await expect(sheet).toContainText('HM-2026-000001 · Classic Hoodie · Red / M · SKU HOOD-RED-M')
+  await expect(sheet).toContainText('HM-2026-000001 · Black Essential Hoodie · Black · Size M')
   // width = 1 × 0.5 × 30, left = 0.5 × 30, top = 0.25 × 40
   await expect(sheet.getByRole('row').filter({ hasText: 'Star logo' })).toContainText(
     '15.0 cm15.0 cm10.0 cm15°',
@@ -918,19 +937,73 @@ test('apparel orders show the garment variant, both previews and a production sh
     'href',
     'https://images.example.test/star-original.png',
   )
+  // Printed text: width = 1 × 0.9 × 30, left = 0.5 × 30, top = 0.75 × 40
+  const text = sheet.getByRole('row').filter({ hasText: 'Text “Kate”' })
+  await expect(text).toContainText('Script')
+  await expect(text).toContainText('#C0392B')
+  await expect(text).toContainText('27.0 cm15.0 cm30.0 cm0°')
+  await expect(sheet.locator('.hm-placed-text')).toHaveText('Kate')
   await expect(sheet.getByRole('button', { name: 'Print production sheet' })).toBeVisible()
-  await expect(sheet).not.toContainText('placed before print areas were saved')
 })
 
-test('older apparel snapshots without print areas warn and fall back to the current garment', async ({
+test('apparel orders show customer uploads in their own section and on the production sheet', async ({
   page,
 }) => {
-  const saved = apparelProduct({ id: 'garment-gone', name: 'Classic Hoodie', imageUrl: null })
+  const saved = apparelProduct({
+    id: 'hoodie',
+    name: 'Hoodie',
+    color: 'Black',
+    imageUrl: null,
+    printAreas: { front: { x: 0.3, y: 0.28, width: 0.4, height: 0.42, widthCm: 30, heightCm: 40 } },
+  })
+  const upload = 'https://images.example.test/custom-designs/artwork.png'
+  const own = { ...saved.items[0], subCategory: { id: 'own', name: 'Your own design', price: 500 } }
+  saved.items = [
+    saved.items[0],
+    { ...own, id: 'own-front', customImageUrl: upload },
+    { ...own, id: 'own-back', side: 'BACK', customImageUrl: upload },
+  ]
+  saved.textLayers = [
+    { id: 't1', text: 'Kate', x: 0.5, y: 0.75, scale: 1, rotation: 0, side: 'FRONT', weight: 'BOLD', italic: true },
+  ]
+  await setup(page, { orders: [{ ...makeOrder(0), product: saved }] })
+  await page.goto('/#/orders')
+  await openFirst(page)
+  const artwork = dialog(page).locator('.hm-uploaded-artwork')
+  await expect(artwork.getByRole('heading', { name: 'Customer uploaded artwork' })).toBeVisible()
+  // One file placed on both sides is listed once.
+  await expect(artwork.getByRole('img')).toHaveCount(1)
+  await expect(artwork.getByRole('img', { name: 'Uploaded artwork 1, Front and Back' })).toHaveAttribute(
+    'src',
+    upload,
+  )
+  await expect(artwork).toContainText('Printed on the front and back')
+  await expect(artwork.getByRole('link', { name: 'Download' })).toHaveAttribute('href', upload)
+  const sheet = dialog(page).locator('.hm-production-sheet')
+  await expect(sheet.getByRole('img', { name: 'Your own design placement 2' })).toHaveAttribute('src', upload)
+  await expect(sheet.getByRole('row').filter({ hasText: 'Customer upload' }).first()).toContainText(
+    'Your own design',
+  )
+  const text = sheet.getByRole('row').filter({ hasText: 'Text “Kate”' })
+  await expect(text).toContainText('Classic (serif) · Bold · Italic')
+  await expect(sheet.locator('.hm-placed-text')).toHaveCSS('font-weight', '700')
+  await expect(sheet.locator('.hm-placed-text')).toHaveCSS('font-style', 'italic')
+})
+
+test('orders without customer uploads have no artwork section', async ({ page }) => {
+  const saved = apparelProduct({ id: 'hoodie', name: 'Hoodie', color: 'Red', imageUrl: null })
+  await setup(page, { orders: [{ ...makeOrder(0), product: saved }] })
+  await page.goto('/#/orders')
+  await openFirst(page)
+  await expect(dialog(page).locator('.hm-production-sheet')).toBeVisible()
+  await expect(dialog(page).locator('.hm-uploaded-artwork')).toHaveCount(0)
+})
+
+test('apparel orders without saved print areas use the default areas', async ({ page }) => {
+  const saved = apparelProduct({ id: 'hoodie', name: 'Hoodie', color: 'Red', imageUrl: null })
   await setup(page, { orders: [{ ...makeOrder(0), product: saved }] })
   await page.goto('/#/orders')
   await openFirst(page)
   const sheet = dialog(page).locator('.hm-production-sheet')
-  await expect(sheet).toContainText('placed before print areas were saved')
-  await expect(sheet).toContainText('Unable to load the current garment; showing default areas.')
   await expect(sheet).toContainText('No front print area was saved; using the default area.')
 })

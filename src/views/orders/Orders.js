@@ -32,9 +32,20 @@ import {
   orderedProduct,
   orderDesignImage,
   orderProductLabel,
+  isCompanyProduct,
+  originLabels,
 } from './orderHelpers'
 
-const emptyFilters = { orderNumber: '', status: '', paymentStatus: '', paymentType: '', userId: '' }
+const emptyFilters = {
+  orderNumber: '',
+  categoryId: '',
+  productId: '',
+  origin: '',
+  status: '',
+  paymentStatus: '',
+  paymentType: '',
+  userId: '',
+}
 const Orders = () => {
   const { userData } = useAuthSelector()
   const isAdmin = userData?.role === 'ADMIN'
@@ -52,6 +63,8 @@ const Orders = () => {
   const [customerAttempt, setCustomerAttempt] = useState(0)
   const [selected, setSelected] = useState(null)
   const [creating, setCreating] = useState(false)
+  const [categories, setCategories] = useState([])
+  const [categoryProducts, setCategoryProducts] = useState({ categoryId: '', items: [] })
   useEffect(() => {
     const controller = new AbortController()
     setLoading(true)
@@ -103,9 +116,39 @@ const Orders = () => {
       })
     return () => controller.abort()
   }, [customerAttempt])
+  useEffect(() => {
+    const controller = new AbortController()
+    api
+      .get('/categories', { signal: controller.signal })
+      .then(({ data }) => Array.isArray(data) && setCategories(data))
+      .catch(() => {})
+    return () => controller.abort()
+  }, [])
+  // The product filter lists the catalog of the chosen category, filtered by the API.
+  useEffect(() => {
+    if (!filters.categoryId) return
+    const controller = new AbortController()
+    const categoryId = filters.categoryId
+    api
+      .get('/products', { params: { categoryId, origin: 'COMPANY' }, signal: controller.signal })
+      .then(({ data }) => Array.isArray(data) && setCategoryProducts({ categoryId, items: data }))
+      .catch(() => {})
+    return () => controller.abort()
+  }, [filters.categoryId])
+  const productOptions =
+    filters.categoryId && categoryProducts.categoryId === filters.categoryId
+      ? categoryProducts.items
+      : []
   const refresh = () => setRevision((value) => value + 1)
-  const changeFilter = (event) =>
-    setFilters((previous) => ({ ...previous, [event.target.name]: event.target.value }))
+  const changeFilter = (event) => {
+    const { name, value } = event.target
+    // A product belongs to one category, so changing the category resets the product.
+    setFilters((previous) => ({
+      ...previous,
+      [name]: value,
+      ...(name === 'categoryId' ? { productId: '' } : {}),
+    }))
+  }
   const selectFilter = (name, label, options) => (
     <div>
       <CFormLabel htmlFor={`filter-${name}`}>{label}</CFormLabel>
@@ -175,6 +218,46 @@ const Orders = () => {
                 onChange={changeFilter}
               />
             </div>
+            <div>
+              <CFormLabel htmlFor="filter-categoryId">Category</CFormLabel>
+              <CFormSelect
+                id="filter-categoryId"
+                name="categoryId"
+                value={filters.categoryId}
+                onChange={changeFilter}
+              >
+                <option value="">All categories</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </CFormSelect>
+            </div>
+            <div>
+              <CFormLabel htmlFor="filter-productId">Product</CFormLabel>
+              <CFormSelect
+                id="filter-productId"
+                name="productId"
+                value={filters.productId}
+                onChange={changeFilter}
+                disabled={!filters.categoryId}
+                aria-describedby="filter-productId-help"
+              >
+                <option value="">
+                  {filters.categoryId ? 'All products' : 'Choose a category first'}
+                </option>
+                {productOptions.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.name}
+                  </option>
+                ))}
+              </CFormSelect>
+              <small id="filter-productId-help" className="hm-muted">
+                Includes customer designs made on it.
+              </small>
+            </div>
+            {selectFilter('origin', 'Origin', originLabels)}
             {selectFilter('status', 'Order status', statusLabels)}
             {selectFilter('paymentStatus', 'Payment status', paymentLabels)}
             {selectFilter('paymentType', 'Payment type', paymentTypes)}
@@ -294,8 +377,10 @@ const Orders = () => {
                         <span className="hm-badge">{orderProductLabel(order)}</span>
                         <small>
                           {orderedProduct(order)?.category?.name || 'Category unavailable'}
-                          {orderedProduct(order)?.productType !== 'READY_MADE' &&
-                            ` · ${orderedProduct(order)?.itemCount ?? 0} beads`}
+                          {!isCompanyProduct(orderedProduct(order)) &&
+                            ` · ${orderedProduct(order)?.itemCount ?? 0} components`}
+                          {orderedProduct(order)?.selectedSize?.name &&
+                            ` · Size ${orderedProduct(order).selectedSize.name}`}
                         </small>
                       </div>
                     </CTableDataCell>
@@ -303,7 +388,7 @@ const Orders = () => {
                       <DesignPreview
                         src={orderDesignImage(order)}
                         name={orderedProduct(order)?.name}
-                        readyMade={orderedProduct(order)?.productType === 'READY_MADE'}
+                        readyMade={isCompanyProduct(orderedProduct(order))}
                       />
                     </CTableDataCell>
                     <CTableDataCell className="text-nowrap">

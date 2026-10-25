@@ -19,140 +19,117 @@ import {
   CSpinner,
 } from '@coreui/react'
 import api, { apiErrorMessage } from '../../_helpers/api'
+import { validateImageFile } from '../../_helpers/imageUpload'
 import ImagePicker from '../../components/ImagePicker'
-import { imageFormData } from '../../_helpers/imageUpload'
 import { useAuthSelector } from '../../redux/selectors/authSelectors'
+import PrintAreaEditor from '../apparel/PrintAreaEditor'
 import ProductImage from './ProductImage'
 import DesignPreview from './DesignPreview'
-import ComponentEditor from './ComponentEditor'
 import ComponentTable from './ComponentTable'
-import { creatorName, formatPrice, productPayload, editableItems } from './productHelpers'
+import SizeInventoryEditor from './SizeInventoryEditor'
+import {
+  companyPayload,
+  creatorName,
+  emptyProductForm,
+  formatPrice,
+  isApparel,
+  isCompany,
+  originLabels,
+  productDate,
+  productForm,
+  productFormData,
+} from './productHelpers'
 
-const initialForm = {
-  productType: 'READY_MADE',
-  price: '',
-  stock: '',
-  name: '',
-  description: '',
-  imageUrl: '',
-  categoryId: '',
-  items: [],
-  isActive: true,
+const useObjectUrl = (file) => {
+  const [url, setUrl] = useState(null)
+  useEffect(() => {
+    if (!file) {
+      setUrl(null)
+      return
+    }
+    const next = URL.createObjectURL(file)
+    setUrl(next)
+    return () => URL.revokeObjectURL(next)
+  }, [file])
+  return url
 }
-const ProductDialog = ({ action, onClose, onSaved }) => {
+
+/**
+ * Admins create and edit COMPANY products (catalog). CUSTOMER products are designs saved
+ * from the app: admins can review them, rename, deactivate or delete them, but never
+ * change their components, price or the piece they were made on.
+ */
+const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => {
   const { userData } = useAuthSelector()
   const isAdmin = userData?.role === 'ADMIN'
-  const editing = ['create', 'edit'].includes(action.mode)
-  const [form, setForm] = useState(initialForm)
   const [record, setRecord] = useState(null)
-  const [categories, setCategories] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [form, setForm] = useState(() =>
+    emptyProductForm(
+      categoryId,
+      isApparel(categories.find((category) => category.id === categoryId)),
+    ),
+  )
+  const [loading, setLoading] = useState(action.mode !== 'create')
   const [loadError, setLoadError] = useState(null)
   const [attempt, setAttempt] = useState(0)
-  const [subAttempt, setSubAttempt] = useState(0)
-  const [subState, setSubState] = useState({
-    categoryId: '',
-    items: [],
-    loading: false,
-    error: null,
-  })
-  const [selectedFile, setSelectedFile] = useState(null)
+  const [image, setImage] = useState(null)
+  const [backImage, setBackImage] = useState(null)
   const submitting = useRef(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
-  const readyMade = form.productType === 'READY_MADE'
+  const imagePreview = useObjectUrl(image)
+  const backPreview = useObjectUrl(backImage)
 
   useEffect(() => {
+    if (action.mode === 'create') return
     const controller = new AbortController()
     setLoading(true)
     setLoadError(null)
-    Promise.all([
-      action.mode === 'create'
-        ? Promise.resolve(null)
-        : api.get(`/products/${encodeURIComponent(action.id)}`, {
-            signal: controller.signal,
-          }),
-      editing ? api.get('/categories', { signal: controller.signal }) : Promise.resolve(null),
-    ])
-      .then(([detail, options]) => {
+    api
+      .get(`/products/${encodeURIComponent(action.id)}`, { signal: controller.signal })
+      .then(({ data }) => {
+        if (!data || typeof data.id !== 'string') throw new Error('Invalid product response')
         if (controller.signal.aborted) return
-        if (options && !Array.isArray(options.data)) throw new Error('Invalid categories response')
-        if (detail && (!detail.data || typeof detail.data.id !== 'string'))
-          throw new Error('Invalid product response')
-        const data = detail?.data
         setRecord(data)
-        setCategories(options?.data || [])
-        setForm(
-          data
-            ? {
-                productType: data.productType ?? 'CUSTOM_DESIGN',
-                price: (data.price / 100).toFixed(2),
-                stock: String(data.stock ?? 0),
-                name: data.name,
-                description: data.description ?? '',
-                imageUrl: data.imageUrl ?? '',
-                categoryId: data.categoryId,
-                items: editableItems(data.items),
-                isActive: data.isActive,
-              }
-            : initialForm,
-        )
+        setForm(productForm(data))
       })
       .catch((error) => {
         if (!controller.signal.aborted)
-          setLoadError(apiErrorMessage(error, 'Unable to load the product form. Please try again.'))
+          setLoadError(apiErrorMessage(error, 'Unable to load the product. Please try again.'))
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false)
       })
     return () => controller.abort()
-  }, [action.id, action.mode, editing, attempt])
+  }, [action.id, action.mode, attempt])
 
-  useEffect(() => {
-    if (!editing || readyMade || loading || loadError || !form.categoryId) return
-    const categoryId = form.categoryId
-    const controller = new AbortController()
-    setSubState({ categoryId, items: [], loading: true, error: null })
-    api
-      .get(`/categories/${encodeURIComponent(categoryId)}/sub-categories`, {
-        signal: controller.signal,
-      })
-      .then(({ data }) => {
-        if (!Array.isArray(data)) throw new Error('Invalid subcategory response')
-        if (!controller.signal.aborted)
-          setSubState({
-            categoryId,
-            items: data.filter((item) => item.isActive && item.categoryId === categoryId),
-            loading: false,
-            error: null,
-          })
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted)
-          setSubState({
-            categoryId,
-            items: [],
-            loading: false,
-            error: apiErrorMessage(error, 'Unable to load subcategories. Please try again.'),
-          })
-      })
-    return () => controller.abort()
-  }, [form.categoryId, editing, readyMade, loading, loadError, subAttempt])
-
-  const subReady =
-    !!form.categoryId &&
-    subState.categoryId === form.categoryId &&
-    !subState.loading &&
-    !subState.error
-  const subItems = subReady ? subState.items : []
+  const company = action.mode === 'create' || isCompany(record)
+  const category = categories.find((entry) => entry.id === form.categoryId)
+  const apparel = isApparel(category ?? record?.category)
+  const silhouette = (category ?? record?.category)?.builderConfig?.silhouette
+  const frontSrc = imagePreview || record?.imageUrl
+  const backSrc = backPreview || record?.backImageUrl || frontSrc
+  const setField = (name) => (value) => setForm((previous) => ({ ...previous, [name]: value }))
   const change = (event) => {
     const { name, value, type, checked } = event.target
-    setForm((previous) => ({
-      ...previous,
-      [name]: type === 'checkbox' ? checked : value,
-      ...(name === 'categoryId' || name === 'productType' ? { items: [] } : {}),
-    }))
+    setForm((previous) => ({ ...previous, [name]: type === 'checkbox' ? checked : value }))
   }
+  const changeCategory = (event) => {
+    const next = categories.find((entry) => entry.id === event.target.value)
+    setForm((previous) => {
+      // Apparel is sold in sizes by default; untouched defaults follow the category.
+      const untouched = !previous.sizes.some((row) => Number(row.stock) > 0)
+      const defaults = emptyProductForm(event.target.value, isApparel(next))
+      return {
+        ...previous,
+        categoryId: event.target.value,
+        ...(untouched && action.mode === 'create'
+          ? { sized: defaults.sized, sizes: defaults.sizes, frontEnabled: defaults.frontEnabled }
+          : {}),
+      }
+    })
+  }
+
   const submit = async (event) => {
     event.preventDefault()
     if (submitting.current) return
@@ -161,113 +138,133 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
       setError('Only administrators can manage products.')
       return
     }
-    let payload
-    if (editing) {
-      if (!form.name.trim()) {
-        setError('Name is required.')
-        return
-      }
-      const componentsChanged =
-        action.mode === 'create' ||
-        form.categoryId !== record?.categoryId ||
-        JSON.stringify(editableItems(record?.items)) !== JSON.stringify(form.items)
-      if (
-        !readyMade &&
-        componentsChanged &&
-        (!categories.some((category) => category.id === form.categoryId) ||
-          !subReady ||
-          !form.items.length ||
-          form.items.some((item) => !subItems.some((sub) => sub.id === item.subCategoryId)))
-      ) {
-        setError('Select an available category and active components for every row.')
-        return
-      }
-      if (readyMade && !categories.some((category) => category.id === form.categoryId)) {
-        setError('Select an available category.')
-        return
-      }
-      if (readyMade && action.mode === 'create' && !selectedFile) {
-        setError('Choose an image for the ready-made product.')
-        return
-      }
-      try {
-        payload = productPayload(form)
-        if (action.mode === 'edit' && !componentsChanged) {
-          delete payload.items
-          delete payload.categoryId
+    let request
+    try {
+      if (action.mode === 'delete')
+        request = () => api.delete(`/products/${encodeURIComponent(action.id)}`)
+      else if (!company) {
+        // Customer designs: only their name, description and visibility are editable.
+        if (!form.name.trim()) throw new Error('Name is required.')
+        const body = {
+          name: form.name.trim(),
+          description: form.description.trim() || null,
+          isActive: form.isActive,
         }
-        if (action.mode === 'edit') delete payload.productType
-      } catch (error) {
-        setError(error.message)
-        return
+        request = () => api.patch(`/products/${encodeURIComponent(action.id)}`, productFormData(body))
+      } else {
+        if (!categories.some((entry) => entry.id === form.categoryId))
+          throw new Error('Select a category.')
+        if (action.mode === 'create' && !image) throw new Error('Choose an image for the product.')
+        for (const file of [image, backImage]) {
+          const invalid = validateImageFile(file)
+          if (invalid) throw new Error(invalid)
+        }
+        const fields = companyPayload(form, apparel)
+        const files = { file: image, ...(apparel ? { backImage } : {}) }
+        const timeout = image || backImage ? 120000 : 15000
+        request =
+          action.mode === 'create'
+            ? () =>
+                api.post('/products', productFormData({ ...fields, origin: 'COMPANY' }, files), {
+                  timeout,
+                })
+            : () =>
+                api.patch(
+                  `/products/${encodeURIComponent(action.id)}`,
+                  productFormData(fields, files),
+                  { timeout },
+                )
       }
+    } catch (validationError) {
+      setError(validationError.message)
+      return
     }
     submitting.current = true
     setSaving(true)
     try {
-      let saved
-      if (action.mode === 'delete') await api.delete(`/products/${encodeURIComponent(action.id)}`)
-      else if (action.mode === 'create')
-        saved = await api.post('/products', imageFormData(payload, selectedFile), {
-          timeout: selectedFile ? 120000 : 15000,
-        })
-      else
-        saved = await api.patch(
-          `/products/${encodeURIComponent(action.id)}`,
-          imageFormData(payload, selectedFile),
-          { timeout: selectedFile ? 120000 : 15000 },
-        )
-      if (saved) {
-        setRecord(saved.data)
-        setSelectedFile(null)
-      }
+      const saved = await request()
       onSaved(
         `Product ${action.mode === 'delete' ? 'deleted' : action.mode === 'create' ? 'created' : 'updated'} successfully.`,
         saved?.data,
       )
     } catch (error) {
-      setError(
-        apiErrorMessage(error) +
-          (error.response?.status === 409 && action.mode === 'edit'
-            ? ' Create a new design to use different components.'
-            : ''),
-      )
+      setError(apiErrorMessage(error))
     } finally {
       submitting.current = false
       setSaving(false)
     }
   }
-  const input = (name, label, props = {}) => (
-    <CCol md={6}>
-      <CFormLabel htmlFor={`product-${name}`}>{label}</CFormLabel>
-      <CFormInput
-        id={`product-${name}`}
-        name={name}
-        value={form[name]}
-        onChange={change}
-        {...props}
-      />
-    </CCol>
-  )
+
   const title = {
     create: 'Add Product',
-    edit: 'Edit Product',
+    edit: company ? 'Edit Product' : 'Edit customer design',
     view: 'Product details',
     delete: 'Delete Product',
   }[action.mode]
-  const fields = record
+  const details = record
     ? [
-        ['Name', record.name],
-        ['Description', record.description || 'Not provided'],
+        ['Origin', originLabels[record.origin] || record.origin],
         ['Category', record.category?.name || 'Unavailable category'],
-        ['Product type', record.productType === 'READY_MADE' ? 'Ready-made' : 'Custom design'],
-        ['Creator', creatorName(record.createdBy)],
-        ['Item count', record.itemCount],
-        ['Price', formatPrice(record.price)],
-        ...(record.productType === 'READY_MADE' ? [['Available stock', record.stock]] : []),
+        ...(company
+          ? [
+              ['Price', formatPrice(record.price)],
+              ...(record.color ? [['Colour', record.color]] : []),
+              ...(record.sizes?.length ? [] : [['Available stock', record.stock]]),
+            ]
+          : [
+              ['Customer', creatorName(record.createdBy)],
+              ...(record.baseProduct ? [['Made on', record.baseProduct.name]] : []),
+              ...(record.selectedSize?.name ? [['Size', record.selectedSize.name]] : []),
+              [
+                'Calculated price',
+                record.basePrice
+                  ? `${formatPrice(record.price)} (${formatPrice(record.basePrice)} base + components)`
+                  : formatPrice(record.price),
+              ],
+              ['Components', record.itemCount],
+            ]),
+        ['Created', productDate(record.createdAt)],
         ['Status', record.isActive ? 'Active' : 'Inactive'],
       ]
     : []
+  const textFields = (
+    <>
+      <CCol md={6}>
+        <CFormLabel htmlFor="product-name">Name</CFormLabel>
+        <CFormInput
+          id="product-name"
+          name="name"
+          required
+          maxLength={200}
+          value={form.name}
+          onChange={change}
+          placeholder={apparel ? 'e.g. Black Essential Hoodie' : undefined}
+        />
+      </CCol>
+      <CCol xs={12}>
+        <CFormLabel htmlFor="product-description">Description</CFormLabel>
+        <CFormTextarea
+          id="product-description"
+          name="description"
+          rows={3}
+          value={form.description}
+          onChange={change}
+        />
+      </CCol>
+    </>
+  )
+  const activeField = (
+    <CCol xs={12}>
+      <CFormCheck
+        id="product-isActive"
+        name="isActive"
+        label="Active"
+        checked={form.isActive}
+        onChange={change}
+      />
+    </CCol>
+  )
+
   return (
     <CModal
       visible
@@ -307,22 +304,74 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
               )}
               {action.mode === 'view' ? (
                 <>
-                  {record?.productType !== 'READY_MADE' && (
+                  {company ? (
+                    <div className="hm-apparel-previews">
+                      <figure>
+                        <figcaption>{record?.backImageUrl ? 'Front' : 'Product image'}</figcaption>
+                        <ProductImage src={record?.imageUrl} name={record?.name} transparent large />
+                      </figure>
+                      {record?.backImageUrl && (
+                        <figure>
+                          <figcaption>Back</figcaption>
+                          <ProductImage
+                            src={record.backImageUrl}
+                            name={`${record.name} back`}
+                            transparent
+                            large
+                          />
+                        </figure>
+                      )}
+                    </div>
+                  ) : (
                     <section className="hm-order-section">
                       <h3>Customer design</h3>
-                      <DesignPreview src={record?.designPreviewUrl} name={record?.name} large />
+                      <div className="hm-apparel-previews">
+                        <figure>
+                          {record?.backDesignPreviewUrl && <figcaption>Front</figcaption>}
+                          <DesignPreview src={record?.designPreviewUrl} name={record?.name} large />
+                        </figure>
+                        {record?.backDesignPreviewUrl && (
+                          <figure>
+                            <figcaption>Back</figcaption>
+                            <DesignPreview
+                              src={record.backDesignPreviewUrl}
+                              name={`${record.name} back`}
+                              large
+                            />
+                          </figure>
+                        )}
+                      </div>
                     </section>
                   )}
-                  <h3>Catalog image</h3>
-                  <ProductImage src={record?.imageUrl} name={record?.name} transparent large />
+                  <h3 className="mt-3">{record?.name}</h3>
+                  {record?.description && <p className="hm-muted">{record.description}</p>}
                   <dl className="hm-catalog-details">
-                    {fields.map(([label, value]) => (
+                    {details.map(([label, value]) => (
                       <div key={label}>
                         <dt>{label}</dt>
                         <dd>{value}</dd>
                       </div>
                     ))}
                   </dl>
+                  {company && record?.sizes?.length > 0 && (
+                    <table className="table table-sm hm-table">
+                      <caption>Stock per size</caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Size</th>
+                          <th scope="col">Stock</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {record.sizes.map((entry) => (
+                          <tr key={entry.size}>
+                            <td>{entry.size}</td>
+                            <td>{entry.stock < 1 ? 'Sold out' : entry.stock}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                   {record?.items?.length > 0 && <ComponentTable items={record.items} />}
                 </>
               ) : action.mode === 'delete' ? (
@@ -330,25 +379,25 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
                   <p>
                     Delete <strong>{record?.name}</strong>?
                   </p>
-                  <p>This action cannot be undone.</p>
+                  <p>
+                    This action cannot be undone. Products that have orders, or that customers
+                    designed on, cannot be deleted; deactivate them instead.
+                  </p>
                 </>
+              ) : !company ? (
+                <fieldset disabled={saving || !isAdmin}>
+                  <CAlert color="info">
+                    This design was created by {creatorName(record?.createdBy)} in the app. Its
+                    components, size and price stay as the customer saved them.
+                  </CAlert>
+                  <CRow className="g-3">
+                    {textFields}
+                    {activeField}
+                  </CRow>
+                </fieldset>
               ) : (
                 <fieldset disabled={saving || !isAdmin}>
                   <CRow className="g-3">
-                    {action.mode === 'create' && (
-                      <CCol xs={12}>
-                        <CFormLabel htmlFor="product-productType">Product type</CFormLabel>
-                        <CFormSelect
-                          id="product-productType"
-                          name="productType"
-                          value={form.productType}
-                          onChange={change}
-                        >
-                          <option value="READY_MADE">Ready-made product</option>
-                          <option value="CUSTOM_DESIGN">Custom design</option>
-                        </CFormSelect>
-                      </CCol>
-                    )}
                     <CCol md={6}>
                       <CFormLabel htmlFor="product-categoryId">Category</CFormLabel>
                       <CFormSelect
@@ -356,99 +405,139 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
                         name="categoryId"
                         required
                         value={form.categoryId}
-                        onChange={change}
-                        disabled={!categories.length}
+                        onChange={changeCategory}
                       >
                         <option value="">Select a category</option>
-                        {form.categoryId &&
-                          !categories.some((category) => category.id === form.categoryId) && (
-                            <option value={form.categoryId} disabled>
-                              Category no longer available
-                            </option>
-                          )}
-                        {categories.map((category) => (
-                          <option value={category.id} key={category.id}>
-                            {category.name}
+                        {categories.map((entry) => (
+                          <option value={entry.id} key={entry.id}>
+                            {entry.name}
                           </option>
                         ))}
                       </CFormSelect>
-                      {!categories.length && (
-                        <p className="mt-2">Create a category before adding a product.</p>
+                    </CCol>
+                    {textFields}
+                    <CCol md={6}>
+                      <CFormLabel htmlFor="product-price">Price (€)</CFormLabel>
+                      <CFormInput
+                        id="product-price"
+                        name="price"
+                        required
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form.price}
+                        onChange={change}
+                      />
+                    </CCol>
+                    {apparel && (
+                      <CCol md={6}>
+                        <CFormLabel htmlFor="product-color">Colour</CFormLabel>
+                        <div className="d-flex gap-2">
+                          <CFormInput
+                            id="product-color"
+                            name="color"
+                            maxLength={60}
+                            placeholder="e.g. Black"
+                            value={form.color}
+                            onChange={change}
+                          />
+                          <CFormInput
+                            type="color"
+                            aria-label="Colour swatch"
+                            className="form-control-color"
+                            value={form.colorHex}
+                            onChange={(event) => setField('colorHex')(event.target.value)}
+                          />
+                        </div>
+                        <small className="hm-muted">
+                          One product is one colour. Sell another colour as its own product.
+                        </small>
+                      </CCol>
+                    )}
+                    <CCol xs={12}>
+                      <CFormCheck
+                        id="product-sized"
+                        label="Sold in sizes (stock per size)"
+                        checked={form.sized}
+                        onChange={(event) => setField('sized')(event.target.checked)}
+                      />
+                    </CCol>
+                    <CCol xs={12}>
+                      {form.sized ? (
+                        <SizeInventoryEditor rows={form.sizes} onChange={setField('sizes')} />
+                      ) : (
+                        <CCol md={6} className="p-0">
+                          <CFormLabel htmlFor="product-stock">Available stock</CFormLabel>
+                          <CFormInput
+                            id="product-stock"
+                            name="stock"
+                            required
+                            type="number"
+                            min="0"
+                            max="2147483647"
+                            step="1"
+                            value={form.stock}
+                            onChange={change}
+                          />
+                        </CCol>
                       )}
                     </CCol>
-                    {!readyMade && (
-                      <CCol xs={12}>
-                        <ComponentEditor
-                          items={form.items}
-                          options={subItems}
-                          ready={subReady}
-                          onChange={(items) => setForm((previous) => ({ ...previous, items }))}
+                    <CCol md={apparel ? 6 : 12}>
+                      <ImagePicker
+                        id="product-image"
+                        file={image}
+                        onChange={setImage}
+                        imageUrl={record?.imageUrl}
+                        name={form.name}
+                        required={action.mode === 'create'}
+                        processBackground
+                        label={apparel ? 'Product image (front)' : undefined}
+                      />
+                    </CCol>
+                    {apparel && (
+                      <CCol md={6}>
+                        <ImagePicker
+                          id="product-back-image"
+                          file={backImage}
+                          onChange={setBackImage}
+                          imageUrl={record?.backImageUrl}
+                          name={`${form.name} back`}
+                          processBackground
+                          label="Back image (optional)"
+                          hint="Used as the studio canvas for designs on the back."
                         />
                       </CCol>
                     )}
-                    {!readyMade &&
-                      form.categoryId &&
-                      subState.categoryId === form.categoryId &&
-                      subState.error && (
-                        <CCol xs={12}>
-                          <CAlert color="danger" role="alert">
-                            {subState.error}{' '}
-                            <CButton
-                              color="link"
-                              onClick={() => setSubAttempt((value) => value + 1)}
-                            >
-                              Retry subcategories
-                            </CButton>
-                          </CAlert>
-                        </CCol>
-                      )}
-                    <CCol xs={12}>
-                      <ImagePicker
-                        id="entity-image"
-                        file={selectedFile}
-                        onChange={setSelectedFile}
-                        imageUrl={record?.imageUrl}
-                        name={form.name}
-                        required={readyMade && action.mode === 'create'}
-                        processBackground
-                      />
-                    </CCol>
-                    {readyMade &&
-                      input('price', 'Price (€)', {
-                        required: true,
-                        type: 'number',
-                        min: '0',
-                        step: '0.01',
-                      })}
-                    {readyMade &&
-                      input('stock', 'Available stock', {
-                        required: true,
-                        type: 'number',
-                        min: '0',
-                        max: '2147483647',
-                        step: '1',
-                      })}
-                    {input('name', 'Name', { required: true, maxLength: 200 })}
-                    <CCol xs={12}>
-                      <CFormLabel htmlFor="product-description">Description</CFormLabel>
-                      <CFormTextarea
-                        id="product-description"
-                        name="description"
-                        rows={3}
-                        value={form.description}
-                        onChange={change}
-                      />
-                    </CCol>
-                    <CCol xs={12}>
-                      <CFormCheck
-                        id="product-isActive"
-                        name="isActive"
-                        label="Active"
-                        checked={form.isActive}
-                        onChange={change}
-                      />
-                    </CCol>
+                    {activeField}
                   </CRow>
+                  {apparel && (
+                    <section className="mt-4" aria-label="Print areas">
+                      <h4>Studio print areas</h4>
+                      <p className="hm-muted small">
+                        Where customers may place designs on this product in the Creative Studio.
+                      </p>
+                      <PrintAreaEditor
+                        side="front"
+                        label="Front"
+                        src={frontSrc}
+                        silhouette={silhouette}
+                        enabled={form.frontEnabled}
+                        area={form.frontPrintArea}
+                        onEnabled={setField('frontEnabled')}
+                        onChange={setField('frontPrintArea')}
+                      />
+                      <PrintAreaEditor
+                        side="back"
+                        label="Back"
+                        src={backSrc}
+                        silhouette={silhouette}
+                        enabled={form.backEnabled}
+                        area={form.backPrintArea}
+                        onEnabled={setField('backEnabled')}
+                        onChange={setField('backPrintArea')}
+                      />
+                    </section>
+                  )}
                 </fieldset>
               )}
             </>
@@ -468,22 +557,14 @@ const ProductDialog = ({ action, onClose, onSaved }) => {
             <CButton
               type="submit"
               color={action.mode === 'delete' ? 'danger' : 'primary'}
-              disabled={
-                saving ||
-                loading ||
-                !!loadError ||
-                !isAdmin ||
-                (action.mode === 'create' &&
-                  !readyMade &&
-                  (!subReady || !form.items.length || !subItems.length))
-              }
+              disabled={saving || loading || !!loadError || !isAdmin}
             >
               {saving ? (
                 <>
                   <CSpinner size="sm" aria-hidden="true" className="me-2" />
                   {action.mode === 'delete'
                     ? 'Deleting...'
-                    : selectedFile
+                    : image || backImage
                       ? 'Saving and processing image...'
                       : 'Saving...'}
                 </>
@@ -504,6 +585,8 @@ ProductDialog.propTypes = {
     mode: PropTypes.oneOf(['create', 'edit', 'view', 'delete']).isRequired,
     id: PropTypes.string,
   }).isRequired,
+  categories: PropTypes.array.isRequired,
+  categoryId: PropTypes.string,
   onClose: PropTypes.func.isRequired,
   onSaved: PropTypes.func.isRequired,
 }

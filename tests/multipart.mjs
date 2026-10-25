@@ -21,7 +21,7 @@ export async function requestBody(request) {
     body[key] =
       typeof value !== 'string'
         ? { name: value.name, type: value.type, size: value.size }
-        : ['items', 'sizes', 'options', 'frontPrintArea', 'backPrintArea'].includes(key)
+        : ['items', 'sizes', 'builderConfig', 'printAreas'].includes(key)
           ? JSON.parse(value)
           : ['isActive', 'trackStock', 'removeBackground'].includes(key)
             ? value === 'true'

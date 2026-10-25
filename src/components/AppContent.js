@@ -8,7 +8,6 @@ const Dashboard = React.lazy(() => import('../views/dashboard/Dashboard'))
 const Users = React.lazy(() => import('../views/base/users/Users'))
 const CatalogPage = React.lazy(() => import('../views/management/CatalogPage'))
 const Products = React.lazy(() => import('../views/products/Products'))
-const GarmentsPage = React.lazy(() => import('../views/garments/GarmentsPage'))
 const Orders = React.lazy(() => import('../views/orders/Orders'))
 const Page404 = React.lazy(() => import('../views/pages/page404/Page404'))
 
@@ -50,7 +49,6 @@ const AppContent = () => (
               }
             />
           ))}
-        <Route path="/categories/:categoryId/garments" element={<GarmentsPage />} />
         <Route path="*" element={<Page404 />} />
       </Routes>
     </Suspense>

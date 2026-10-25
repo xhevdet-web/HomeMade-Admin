@@ -1,15 +1,23 @@
-import { useEffect, useState } from 'react'
 import PropTypes from 'prop-types'
-import { CAlert, CButton } from '@coreui/react'
-import api from '../../_helpers/api'
-import { MockupCanvas } from '../garments/PrintAreaEditor'
-import { defaultPrintArea, garmentEndpoints, placementMeasurements } from '../garments/garmentHelpers'
+import { CButton } from '@coreui/react'
+import { MockupCanvas } from '../apparel/PrintAreaEditor'
+import {
+  defaultPrintArea,
+  placementMeasurements,
+  TEXT_WIDTH_SHARE,
+  textCss,
+  textMeasurements,
+  textStyleLabel,
+} from '../apparel/apparelHelpers'
 
 const sides = [
   ['FRONT', 'front', 'Front'],
   ['BACK', 'back', 'Back'],
 ]
-const designImage = (item) => item.subCategory?.originalImageUrl || item.subCategory?.imageUrl
+// The customer's own upload when there is one, else the catalog design's original.
+const designImage = (item) =>
+  item.customImageUrl || item.subCategory?.originalImageUrl || item.subCategory?.imageUrl
+const productionFile = (item) => item.customImageUrl || item.subCategory?.originalImageUrl
 
 const printSheet = () => {
   document.body.classList.add('hm-printing-production')
@@ -21,25 +29,19 @@ const printSheet = () => {
   window.print()
 }
 
-/** Exact placements of each design, converted to centimetres of the garment's print area. */
+/**
+ * Exact placements of each design, converted to centimetres of the print area of the
+ * base product as it was when the order was placed.
+ */
 const ProductionSheet = ({ product, orderNumber }) => {
-  const variant = product?.garmentVariant
-  const snapshotGarment = variant?.garment
-  // Orders placed before print areas were snapshotted fall back to the current garment.
-  const legacy = !!snapshotGarment && snapshotGarment.frontPrintArea === undefined
-  const [current, setCurrent] = useState(null)
-  useEffect(() => {
-    if (!legacy || !snapshotGarment.id) return
-    const controller = new AbortController()
-    api
-      .get(garmentEndpoints.detail(snapshotGarment.id), { signal: controller.signal })
-      .then(({ data }) => setCurrent(data))
-      .catch(() => {})
-    return () => controller.abort()
-  }, [legacy, snapshotGarment?.id])
-  const garment = legacy ? { ...snapshotGarment, ...(current || {}) } : snapshotGarment
+  const base = product?.baseProduct
   const placed = (product?.items || []).filter((item) => item.side && item.x !== null && item.x !== undefined)
-  if (!variant || !placed.length) return null
+  // Printed text: every layer names the side it goes on.
+  const texts = (Array.isArray(product?.textLayers) ? product.textLayers : []).filter(
+    (layer) => layer?.side && typeof layer.text === 'string',
+  )
+  if (!base || (!placed.length && !texts.length)) return null
+  const silhouette = product?.category?.builderConfig?.silhouette
 
   return (
     <section className="hm-order-section hm-production-sheet" aria-labelledby="production-sheet-title">
@@ -50,21 +52,15 @@ const ProductionSheet = ({ product, orderNumber }) => {
         </CButton>
       </div>
       <p className="hm-production-meta">
-        {orderNumber} · {garment?.name} · {variant.colorName} / {variant.size}
-        {variant.sku ? ` · SKU ${variant.sku}` : ''}
+        {orderNumber} · {base.name}
+        {base.color ? ` · ${base.color}` : ''}
+        {product?.selectedSize?.name ? ` · Size ${product.selectedSize.name}` : ''}
       </p>
-      {legacy && (
-        <CAlert color="warning" className="hm-no-print">
-          This order was placed before print areas were saved with orders.{' '}
-          {current
-            ? 'Measurements use the garment’s current print areas and mockups.'
-            : 'Unable to load the current garment; showing default areas.'}
-        </CAlert>
-      )}
       {sides.map(([side, key, label]) => {
         const items = placed.filter((item) => item.side === side)
-        if (!items.length) return null
-        const savedArea = garment?.[`${key}PrintArea`]
+        const sideTexts = texts.filter((layer) => layer.side === side)
+        if (!items.length && !sideTexts.length) return null
+        const savedArea = base.printAreas?.[key]
         const area = savedArea || defaultPrintArea(key)
         return (
           <div className="hm-production-side" key={side}>
@@ -75,15 +71,15 @@ const ProductionSheet = ({ product, orderNumber }) => {
             {!Number.isFinite(Number(area.widthCm)) && (
               <p className="hm-muted small">
                 The real print size is not set for this side, so centimetres cannot be calculated.
-                Set it on the garment.
+                Set it on the product.
               </p>
             )}
             <div className="hm-production-layout">
               <div className="hm-production-mockup">
                 <MockupCanvas
-                  // The back reuses the front mockup when no separate one was uploaded.
-                  src={garment?.[`${key}ImageUrl`] || garment?.frontImageUrl}
-                  silhouette={garment?.silhouette}
+                  // The back reuses the front image when no separate one was uploaded.
+                  src={(key === 'back' && base.backImageUrl) || base.imageUrl}
+                  silhouette={silhouette}
                   side={key}
                   area={area}
                 >
@@ -101,6 +97,21 @@ const ProductionSheet = ({ product, orderNumber }) => {
                         transform: `translate(-50%, -50%) rotate(${item.rotation ?? 0}deg)`,
                       }}
                     />
+                  ))}
+                  {sideTexts.map((layer) => (
+                    <span
+                      key={layer.id}
+                      className="hm-placed-text"
+                      style={{
+                        left: `${layer.x * 100}%`,
+                        top: `${layer.y * 100}%`,
+                        width: `${(layer.scale ?? 1) * TEXT_WIDTH_SHARE * 100}%`,
+                        ...textCss(layer),
+                        transform: `translate(-50%, -50%) rotate(${layer.rotation ?? 0}deg)`,
+                      }}
+                    >
+                      {layer.text}
+                    </span>
                   ))}
                 </MockupCanvas>
                 <small className="hm-muted">
@@ -123,6 +134,7 @@ const ProductionSheet = ({ product, orderNumber }) => {
                     {items.map((item, index) => {
                       const size = placementMeasurements(item, area)
                       const image = designImage(item)
+                      const file = productionFile(item)
                       return (
                         <tr key={item.id || index}>
                           <td>
@@ -130,10 +142,13 @@ const ProductionSheet = ({ product, orderNumber }) => {
                               {image && <img src={image} alt="" referrerPolicy="no-referrer" />}
                               <div>
                                 <strong>{item.subCategory?.name || 'Unavailable design'}</strong>
-                                {item.subCategory?.originalImageUrl && (
+                                {item.customImageUrl && (
+                                  <span className="d-block small hm-muted">Customer upload</span>
+                                )}
+                                {file && (
                                   <a
                                     className="d-block small hm-no-print"
-                                    href={item.subCategory.originalImageUrl}
+                                    href={file}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     download
@@ -143,6 +158,30 @@ const ProductionSheet = ({ product, orderNumber }) => {
                                 )}
                               </div>
                             </div>
+                          </td>
+                          <td>{size.width}</td>
+                          <td>{size.left}</td>
+                          <td>{size.top}</td>
+                          <td>{size.rotation}</td>
+                        </tr>
+                      )
+                    })}
+                    {sideTexts.map((layer) => {
+                      const size = textMeasurements(layer, area)
+                      return (
+                        <tr key={layer.id}>
+                          <td>
+                            <strong>Text “{layer.text}”</strong>
+                            <span className="d-block small hm-muted">
+                              {textStyleLabel(layer)}
+                              {' · '}
+                              <span
+                                className="hm-swatch"
+                                style={{ backgroundColor: layer.color || '#2D3250' }}
+                                aria-hidden="true"
+                              />{' '}
+                              {layer.color || '#2D3250'}
+                            </span>
                           </td>
                           <td>{size.width}</td>
                           <td>{size.left}</td>

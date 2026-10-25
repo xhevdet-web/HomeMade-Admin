@@ -1,3 +1,5 @@
+import { designTypes } from '../apparel/apparelHelpers'
+
 export const catalogConfig = {
   categories: {
     title: 'Categories',
@@ -16,7 +18,8 @@ export const catalogConfig = {
 export const emptyCatalogForm = {
   sizes: [],
   builderType: '',
-  options: [],
+  // APPAREL: the app-drawn garment shape shown until a product has its own images.
+  silhouette: '',
   designCategoryId: '',
   name: '',
   description: '',
@@ -37,17 +40,21 @@ export const builderLabels = {
   GIFT: 'Gift',
 }
 
-export const defaultBuilderOptions = (builderType) => {
-  if (builderType === 'BOUQUET')
-    return [
-      { key: 'bouquetSize', name: 'Bouquet Size', type: 'select', required: true, values: [] },
-    ]
-  return []
+// Component types per studio. The app uses them for its picker filters (Flowers, Greenery,
+// Decorations…) and a sensible starting size; customers arrange pieces freely.
+const componentTypes = {
+  APPAREL: designTypes,
+  BOUQUET: {
+    FLOWER: 'Flower',
+    GREENERY: 'Greenery',
+    FILLER: 'Filler',
+    DECORATION: 'Decoration',
+    WRAPPING: 'Wrapping',
+  },
+  GIFT: { BAG: 'Bag & box', FILLER: 'Filler', ITEM: 'Item', DECORATION: 'Decoration' },
 }
-
-// Apparel size and colour now live on garment variants, not on Category.options.
-export const legacyApparelOptions = (options = []) =>
-  options.filter((option) => ['size', 'color'].includes(option.key))
+/** Type choices for a component of a category with this builder; free text is always allowed. */
+export const typesFor = (builderType) => componentTypes[builderType] || {}
 
 export const sizeId = (name) =>
   name
@@ -79,68 +86,12 @@ export const categorySizes = (sizes = []) => {
   })
 }
 
-const validateStrings = (option) => {
-  const values = option.values ?? []
-  if (!Array.isArray(values) || values.some((value) => typeof value !== 'string' || !value.trim()))
-    throw new Error(`${option.name}: values cannot be empty.`)
-  if (!values.length) throw new Error(`${option.name}: add at least one value.`)
-  const normalized = values.map((value) => value.trim())
-  if (new Set(normalized.map((value) => value.toLowerCase())).size !== normalized.length)
-    throw new Error(`${option.name}: values must be unique.`)
-  return normalized
-}
-
-const validateColors = (option) => {
-  const values = option.values ?? []
-  if (!Array.isArray(values)) throw new Error(`${option.name}: colors are invalid.`)
-  const normalized = values.map((color, index) => {
-    const name = color?.name?.trim()
-    const value = color?.value?.trim()
-    if (!name || !value) throw new Error(`${option.name}: color ${index + 1} is incomplete.`)
-    return { name, value }
-  })
-  if (new Set(normalized.map((color) => color.value.toLowerCase())).size !== normalized.length)
-    throw new Error(`${option.name}: color values must be unique.`)
-  return normalized
-}
-
-export const categoryOptions = (options = []) => {
-  const keys = new Set()
-  return options.map((option) => {
-    if (!option?.key?.trim() || !option?.name?.trim())
-      throw new Error('Every option requires a key and name.')
-    if (keys.has(option.key)) throw new Error('Option keys must be unique.')
-    keys.add(option.key)
-    if (!['select', 'color', 'number', 'text'].includes(option.type))
-      throw new Error(`${option.name}: invalid option type.`)
-    if (typeof option.required !== 'boolean')
-      throw new Error(`${option.name}: required must be true or false.`)
-    const result = {
-      key: option.key,
-      name: option.name.trim(),
-      type: option.type,
-      required: option.required,
-    }
-    if (option.type === 'select') result.values = validateStrings(option)
-    if (option.type === 'color') result.values = validateColors(option)
-    if (option.type === 'number') {
-      const min = option.min === '' || option.min == null ? undefined : Number(option.min)
-      const max = option.max === '' || option.max == null ? undefined : Number(option.max)
-      if ((min !== undefined && !Number.isFinite(min)) || (max !== undefined && !Number.isFinite(max)))
-        throw new Error(`${option.name}: minimum and maximum must be valid numbers.`)
-      if (min !== undefined && max !== undefined && min > max)
-        throw new Error(`${option.name}: minimum cannot exceed maximum.`)
-      if (min !== undefined) result.min = min
-      if (max !== undefined) result.max = max
-    }
-    if (option.type === 'text') {
-      const maxLength = Number(option.maxLength)
-      if (!Number.isInteger(maxLength) || maxLength < 1 || maxLength > 10000)
-        throw new Error(`${option.name}: maximum length must be a whole number from 1 to 10,000.`)
-      result.maxLength = maxLength
-    }
-    return result
-  })
+export const categoryForm = (record) => {
+  const form = Object.fromEntries(
+    Object.entries(emptyCatalogForm).map(([key, fallback]) => [key, record?.[key] ?? fallback]),
+  )
+  form.silhouette = record?.builderConfig?.silhouette ?? ''
+  return form
 }
 
 export const catalogPayload = (form, isSubCategory) => {
@@ -165,16 +116,10 @@ export const catalogPayload = (form, isSubCategory) => {
     payload.builderType = form.builderType || null
     payload.designCategoryId =
       form.builderType === 'APPAREL' ? form.designCategoryId || null : null
-    if (form.builderType === 'JEWELRY') {
-      payload.sizes = categorySizes(form.sizes ?? [])
-      payload.options = null
-    } else if (form.builderType) {
-      payload.sizes = null
-      payload.options = categoryOptions(form.options ?? [])
-    } else {
-      payload.sizes = null
-      payload.options = null
-    }
+    payload.sizes = form.builderType === 'JEWELRY' ? categorySizes(form.sizes ?? []) : null
+    // Colour and size live on each apparel product; the category only keeps the shape.
+    if (form.builderType === 'APPAREL')
+      payload.builderConfig = form.silhouette ? { silhouette: form.silhouette } : null
   }
   return payload
 }

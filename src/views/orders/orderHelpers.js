@@ -41,19 +41,20 @@ export const nextStatus = (status) => {
   return index < 0 ? null : workflow[index + 1] || null
 }
 
-// Snapshot fields preserve the design that was purchased, even if the catalog changes.
-export const orderedProduct = (order) => {
-  const snapshot = order?.designSnapshot
-  // Backend snapshots are versioned envelopes, not the product itself.
-  if (snapshot?.version === 1 && snapshot.product && typeof snapshot.product === 'object')
-    return snapshot.product
-  return order?.product
-}
+export const originLabels = { COMPANY: 'Company', CUSTOMER: 'Customer' }
+
+// The API returns the product as purchased (from the order snapshot, every snapshot
+// version in one shape), so catalog edits never change an order.
+export const orderedProduct = (order) => order?.product ?? order?.designSnapshot?.product
+export const isCompanyProduct = (product) => product?.origin === 'COMPANY'
 export const orderProductLabel = (order) =>
-  orderedProduct(order)?.productType === 'READY_MADE' ? 'Ready-made product' : 'Custom design'
+  isCompanyProduct(orderedProduct(order)) ? 'Company product' : 'Customer design'
 export const orderDesignImage = (order) => {
   const product = orderedProduct(order)
-  return product?.productType === 'READY_MADE'
+  return isCompanyProduct(product)
     ? product.imageUrl
     : order?.designPreviewUrl ?? product?.designPreviewUrl
 }
+/** "L", or "Medium · 18 cm" for a jewelry size preset. */
+export const sizeLabel = (size) =>
+  size?.name ? `${size.name}${size.measurement ? ` · ${size.measurement} ${size.unit}` : ''}` : null

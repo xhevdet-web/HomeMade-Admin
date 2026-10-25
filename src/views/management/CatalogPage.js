@@ -18,25 +18,17 @@ import api, { apiErrorMessage } from '../../_helpers/api'
 import EmptyState from '../../components/EmptyState'
 import CatalogDialog from './CatalogDialog'
 import ProductImage from '../products/ProductImage'
-import { builderLabels, catalogConfig, legacyApparelOptions } from './catalogFields'
+import { builderLabels, catalogConfig } from './catalogFields'
+import { silhouettes } from '../apparel/apparelHelpers'
 
 const configurationSummary = (record) => {
   if (record.builderType === 'JEWELRY') {
     const count = record.sizes?.length || 0
     return count ? `${count} ${count === 1 ? 'size' : 'sizes'}` : 'Not configured'
   }
-  if (record.builderType === 'APPAREL') {
-    const extras = (record.options || []).length - legacyApparelOptions(record.options || []).length
-    const parts = ['Garments']
-    if (extras) parts.push(`${extras} extra ${extras === 1 ? 'option' : 'options'}`)
-    if (legacyApparelOptions(record.options || []).length) parts.push('old size/colour options')
-    return parts.join(' · ')
-  }
-  if (['BOUQUET', 'GIFT'].includes(record.builderType)) {
-    const count = record.options?.length || 0
-    return count ? `${count} ${count === 1 ? 'option' : 'options'}` : 'Not configured'
-  }
-  return 'Not configured'
+  if (record.builderType === 'APPAREL')
+    return `${silhouettes[record.builderConfig?.silhouette] || 'No'} silhouette`
+  return record.builderType ? 'Studio ready' : 'Not configured'
 }
 
 const CatalogPage = ({ kind }) => {
@@ -237,15 +229,15 @@ const CatalogPage = ({ kind }) => {
                         >
                           Edit
                         </CButton>
-                        {!isSubCategory && record.builderType === 'APPAREL' && (
+                        {!isSubCategory && (
                           <CButton
                             as={Link}
-                            to={`/categories/${record.id}/garments`}
+                            to={`/products?categoryId=${encodeURIComponent(record.id)}`}
                             color="primary"
                             size="sm"
-                            aria-label={`Garments of ${record.name}`}
+                            aria-label={`Products of ${record.name}`}
                           >
-                            Garments
+                            Products
                           </CButton>
                         )}
                         <CButton

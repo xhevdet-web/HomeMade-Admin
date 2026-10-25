@@ -11,7 +11,6 @@ const baseCategory = {
   imageUrl: 'https://example.com/necklaces.jpg',
   builderType: 'JEWELRY',
   sizes: [],
-  options: null,
   isActive: true,
   sortOrder: 2,
 }
@@ -175,7 +174,6 @@ test('Category create, detail, edit and confirmed delete use exact API contracts
     builderType: '',
     designCategoryId: '',
     sizes: null,
-    options: null,
   })
   await expect(page.getByRole('cell', { name: 'Rings', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'View Rings', exact: true }).click()
@@ -300,88 +298,87 @@ test('multiple sizes block duplicate generated IDs and invalid limits before sen
   ])
 })
 
-test('apparel categories pick a design library, keep only extra options and link to garments', async ({
+test('apparel categories pick a design library and garment shape, and link to their products', async ({
   page,
 }) => {
   const libraryId = '55555555-5555-4555-8555-555555555555'
   const state = await setup(page, {
     categories: [
       { ...baseCategory },
-      { ...baseCategory, id: libraryId, name: 'Apparel Designs', builderType: 'GIFT', options: [] },
+      { ...baseCategory, id: libraryId, name: 'Apparel Designs', builderType: 'GIFT' },
     ],
   })
   await page.goto('/#/categories')
   await page.getByRole('button', { name: 'Create Category', exact: true }).click()
   await dialog(page).getByLabel('Name', { exact: true }).fill('Hoodies')
   await dialog(page).getByLabel('Builder Type').selectOption('APPAREL')
-  // Price and stock moved to garments; size and colour moved to variants.
+  // Price, stock, colour and sizes live on each product, never on the category.
   await expect(dialog(page).getByLabel('Base Price (€)')).toHaveCount(0)
   await expect(dialog(page).getByLabel('Stock', { exact: true })).toHaveCount(0)
   await expect(dialog(page).getByRole('button', { name: '+ Add Size' })).toHaveCount(0)
+  await expect(dialog(page)).toContainText('Colours, sizes and stock are set on each product')
+  await expect(dialog(page).getByLabel('Garment shape')).toHaveValue('HOODIE')
+  await dialog(page).getByLabel('Garment shape').selectOption('TSHIRT')
   await expect(dialog(page)).toContainText('shared Apparel Designs category for Hoodies and T-Shirts')
   await dialog(page).getByLabel('Design library').selectOption(libraryId)
-  await dialog(page).getByLabel('Enabled', { exact: true }).check()
   await dialog(page).getByRole('button', { name: 'Save Category' }).click()
   await expect(dialog(page)).toHaveCount(0)
   const created = state.requests.find((request) => request.method === 'POST').body
-  expect(created).toMatchObject({ builderType: 'APPAREL', designCategoryId: libraryId, sizes: null })
-  expect(created).not.toHaveProperty('basePrice')
-  expect(created).not.toHaveProperty('stock')
-  expect(created.options).toEqual([
-    { key: 'giftMessage', name: 'Gift Message', type: 'text', required: false, maxLength: 200 },
-  ])
+  expect(created).toMatchObject({
+    builderType: 'APPAREL',
+    designCategoryId: libraryId,
+    sizes: null,
+    builderConfig: { silhouette: 'TSHIRT' },
+  })
+  for (const field of ['basePrice', 'stock', 'options']) expect(created).not.toHaveProperty(field)
   const row = page.getByRole('row').filter({ hasText: 'Hoodies' })
-  await expect(row).toContainText('Garments · 1 extra option')
-  await expect(row.getByRole('link', { name: 'Garments of Hoodies' })).toHaveAttribute(
+  await expect(row).toContainText('T-Shirt silhouette')
+  await expect(row.getByRole('link', { name: 'Products of Hoodies' })).toHaveAttribute(
     'href',
-    /#\/categories\/.+\/garments$/,
+    /#\/products\?categoryId=.+$/,
   )
   page.once('dialog', (confirmation) => confirmation.accept())
   await page.getByRole('button', { name: 'Edit Hoodies' }).click()
   await expect(dialog(page).getByLabel('Design library')).toHaveValue(libraryId)
+  await expect(dialog(page).getByLabel('Garment shape')).toHaveValue('TSHIRT')
   await dialog(page).getByLabel('Builder Type').selectOption('GIFT')
+  await expect(dialog(page).getByLabel('Garment shape')).toHaveCount(0)
   await dialog(page).getByRole('button', { name: 'Save Category' }).click()
   // Leaving APPAREL clears the library (multipart "" is null on the API).
-  expect(state.requests.filter((request) => request.method === 'PATCH').at(-1).body).toMatchObject({
-    builderType: 'GIFT',
-    designCategoryId: '',
-  })
+  const patched = state.requests.filter((request) => request.method === 'PATCH').at(-1).body
+  expect(patched).toMatchObject({ builderType: 'GIFT', designCategoryId: '' })
+  expect(patched).not.toHaveProperty('builderConfig')
 })
 
-test('legacy apparel size and colour options show a warning and can be removed', async ({ page }) => {
-  const state = await setup(page, {
+test('component types follow the studio of the chosen category', async ({ page }) => {
+  await setup(page, {
     categories: [
-      {
-        ...baseCategory,
-        name: 'Old Hoodies',
-        builderType: 'APPAREL',
-        sizes: null,
-        options: [
-          { key: 'size', name: 'Size', type: 'select', required: true, values: ['S'] },
-          { key: 'color', name: 'Color', type: 'color', required: true, values: [{ name: 'Red', value: '#C0392B' }] },
-          { key: 'giftMessage', name: 'Gift Message', type: 'text', required: false, maxLength: 80 },
-        ],
-      },
+      { ...baseCategory, name: 'Flowers', builderType: 'BOUQUET' },
+      { ...secondCategory, name: 'Gifts', builderType: 'GIFT' },
     ],
+    subs: [{ ...baseSub, name: 'Kraft wrap', type: 'WRAPPING' }],
   })
-  await page.goto('/#/categories')
-  await expect(page.getByRole('row').filter({ hasText: 'Old Hoodies' })).toContainText(
-    'old size/colour options',
-  )
-  await page.getByRole('button', { name: 'Edit Old Hoodies' }).click()
-  await expect(dialog(page).getByRole('alert')).toContainText('size and color options')
-  await dialog(page).getByRole('button', { name: 'Remove size and colour options' }).click()
-  await expect(dialog(page).getByRole('alert')).toHaveCount(0)
-  await dialog(page).getByRole('button', { name: 'Save Category' }).click()
-  expect(state.requests.find((request) => request.method === 'PATCH').body.options).toEqual([
-    { key: 'giftMessage', name: 'Gift Message', type: 'text', required: false, maxLength: 80 },
+  await page.goto('/#/sub-categories')
+  await page.getByRole('button', { name: 'Edit Kraft wrap', exact: true }).click()
+  const type = dialog(page).getByLabel('Type', { exact: true })
+  await expect(type).toHaveValue('WRAPPING')
+  await expect(type.locator('option')).toHaveText([
+    'Not specified', 'Flower', 'Greenery', 'Filler', 'Decoration', 'Wrapping', 'Other (free text, e.g. beads)',
   ])
+  await dialog(page).getByLabel('Category', { exact: true }).selectOption(secondId)
+  await expect(type.locator('option')).toHaveText([
+    'Not specified', 'Bag & box', 'Filler', 'Item', 'Decoration', 'Other (free text, e.g. beads)',
+  ])
+  // WRAPPING is not a gift type, so it is kept as free text instead of being lost.
+  await expect(dialog(page).getByLabel('Custom type')).toHaveValue('WRAPPING')
 })
 
 test('designs support typed or free-text types, unlimited stock and background options', async ({
   page,
 }) => {
   const state = await setup(page, {
+    // Logo, Icon, Lettering and Illustration are the apparel studio's design types.
+    categories: [{ ...baseCategory, name: 'Hoodies', builderType: 'APPAREL' }],
     subs: [
       {
         ...baseSub,
@@ -415,48 +412,6 @@ test('designs support typed or free-text types, unlimited stock and background o
     removeBackground: false,
     stock: 12,
   })
-})
-
-test('bouquet controls generate select, number and optional color options', async ({ page }) => {
-  const state = await setup(page, { categories: [] })
-  await page.goto('/#/categories')
-  await page.getByRole('button', { name: 'Create Category' }).click()
-  await dialog(page).getByLabel('Name', { exact: true }).fill('Flowers')
-  await dialog(page).getByLabel('Builder Type').selectOption('BOUQUET')
-  await dialog(page).getByRole('button', { name: '+ Add Value' }).click()
-  await dialog(page).getByLabel('Bouquet Sizes 1').fill('Small')
-  await dialog(page).getByLabel('Enabled', { exact: true }).check()
-  await dialog(page).getByLabel('Minimum').fill('5')
-  await dialog(page).getByLabel('Maximum').fill('50')
-  await dialog(page).getByLabel('Wrapper Colors enabled').check()
-  await dialog(page).getByRole('button', { name: '+ Add Color' }).click()
-  await dialog(page).getByLabel('Wrapper Colors 1 Name').fill('Kraft')
-  await dialog(page).getByLabel('Wrapper Colors 1 Color value').fill('#A67C52')
-  await dialog(page).getByRole('button', { name: 'Save Category' }).click()
-  expect(state.requests.find((request) => request.method === 'POST').body.options).toEqual([
-    {
-      key: 'bouquetSize',
-      name: 'Bouquet Size',
-      type: 'select',
-      required: true,
-      values: ['Small'],
-    },
-    {
-      key: 'flowerCount',
-      name: 'Number of Flowers',
-      type: 'number',
-      required: false,
-      min: 5,
-      max: 50,
-    },
-    {
-      key: 'wrapperColor',
-      name: 'Wrapper Color',
-      type: 'color',
-      required: false,
-      values: [{ name: 'Kraft', value: '#A67C52' }],
-    },
-  ])
 })
 
 test('catalog image processing uses returned images and preserves drafts on upload errors', async ({
