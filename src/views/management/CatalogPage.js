@@ -5,6 +5,7 @@ import {
   CButton,
   CCard,
   CFormInput,
+  CFormSelect,
   CSpinner,
   CTable,
   CTableHead,
@@ -13,18 +14,23 @@ import {
   CTableHeaderCell,
   CTableDataCell,
 } from '@coreui/react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import api, { apiErrorMessage } from '../../_helpers/api'
 import EmptyState from '../../components/EmptyState'
 import CatalogDialog from './CatalogDialog'
 import ProductImage from '../products/ProductImage'
-import { builderLabels, catalogConfig } from './catalogFields'
+import { builderLabels, catalogConfig, isJewelryCategory } from './catalogFields'
 import { silhouettes } from '../apparel/apparelHelpers'
 
 const configurationSummary = (record) => {
   if (record.builderType === 'JEWELRY') {
     const count = record.sizes?.length || 0
-    return count ? `${count} ${count === 1 ? 'size' : 'sizes'}` : 'Not configured'
+    if (!count) return 'Not configured'
+    const sizes = `${count} ${count === 1 ? 'size' : 'sizes'}`
+    // Sizes still in the old component-count format need lengths set.
+    return record.sizes.some((size) => !Number.isFinite(size.minMeasurementMm))
+      ? `${sizes} · set lengths`
+      : `${sizes} · by length`
   }
   if (record.builderType === 'APPAREL')
     return `${silhouettes[record.builderConfig?.silhouette] || 'No'} silhouette`
@@ -60,20 +66,46 @@ const CatalogPage = ({ kind }) => {
       })
     return () => controller.abort()
   }, [endpoint, revision])
+  // SubCategories can be narrowed to one category; kept in the URL so it survives a refresh.
+  const [params, setParams] = useSearchParams()
+  const categoryFilter = isSubCategory ? params.get('categoryId') || '' : ''
+  const setCategoryFilter = (value) =>
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous)
+        if (value) next.set('categoryId', value)
+        else next.delete('categoryId')
+        return next
+      },
+      { replace: true },
+    )
+  const categoryOptions = useMemo(
+    () =>
+      [
+        ...new Map(
+          records
+            .filter((record) => record.category)
+            .map((record) => [record.category.id, record.category]),
+        ).values(),
+      ].sort((a, b) => a.name.localeCompare(b.name)),
+    [records],
+  )
   const filtered = useMemo(
     () =>
-      records.filter((record) =>
-        `${record.name} ${record.description || ''} ${record.category?.name || ''}`
-          .toLowerCase()
-          .includes(query.trim().toLowerCase()),
+      records.filter(
+        (record) =>
+          (!categoryFilter || record.categoryId === categoryFilter) &&
+          `${record.name} ${record.description || ''} ${record.category?.name || ''}`
+            .toLowerCase()
+            .includes(query.trim().toLowerCase()),
       ),
-    [records, query],
+    [records, query, categoryFilter],
   )
   const columns = [
     'Image',
     'Name',
     ...(isSubCategory
-      ? ['Category', 'Color', 'Price (cents)', 'Stock']
+      ? ['Category', 'Color', 'Size', 'Price (cents)', 'Stock']
       : ['Type', 'Configuration']),
     'Status',
     'Sort order',
@@ -113,6 +145,25 @@ const CatalogPage = ({ kind }) => {
             </p>
           </div>
           <div className="hm-catalog-tools">
+            {isSubCategory && (
+              <CFormSelect
+                aria-label="Filter by category"
+                className="hm-search"
+                value={categoryFilter}
+                onChange={(event) => setCategoryFilter(event.target.value)}
+              >
+                <option value="">All categories</option>
+                {categoryOptions.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+                {categoryFilter &&
+                  !categoryOptions.some((category) => category.id === categoryFilter) && (
+                    <option value={categoryFilter}>Selected category (no components)</option>
+                  )}
+              </CFormSelect>
+            )}
             <CFormInput
               type="search"
               className="hm-search"
@@ -191,6 +242,16 @@ const CatalogPage = ({ kind }) => {
                             {record.color || 'Not specified'}
                           </span>
                         </CTableDataCell>
+                        <CTableDataCell>
+                          {/* Only jewelry components are measured; a missing size blocks them in the app. */}
+                          {!isJewelryCategory(record.category) ? (
+                            <span className="hm-muted">—</span>
+                          ) : record.effectiveLengthMm ? (
+                            `${record.effectiveLengthMm} mm`
+                          ) : (
+                            <span className="hm-badge">Physical size required</span>
+                          )}
+                        </CTableDataCell>
                         <CTableDataCell>{record.price}</CTableDataCell>
                         <CTableDataCell>
                           {record.trackStock === false ? 'Unlimited' : record.stock}
@@ -257,10 +318,14 @@ const CatalogPage = ({ kind }) => {
                 <CTableRow>
                   <CTableDataCell colSpan={columns.length}>
                     <EmptyState
-                      title={query ? 'No matching results' : `No ${title.toLowerCase()} yet`}
+                      title={
+                        query || categoryFilter
+                          ? 'No matching results'
+                          : `No ${title.toLowerCase()} yet`
+                      }
                       description={
-                        query
-                          ? 'Try a different search.'
+                        query || categoryFilter
+                          ? 'Try a different search or category.'
                           : `Create your first ${singular.toLowerCase()} to get started.`
                       }
                     />

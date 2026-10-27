@@ -39,6 +39,8 @@ import {
   productForm,
   productFormData,
 } from './productHelpers'
+import { packagingLabel } from '../giftPackaging/packagingHelpers'
+import { sizeLabel } from '../orders/orderHelpers'
 
 const useObjectUrl = (file) => {
   const [url, setUrl] = useState(null)
@@ -214,11 +216,18 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
           : [
               ['Customer', creatorName(record.createdBy)],
               ...(record.baseProduct ? [['Made on', record.baseProduct.name]] : []),
-              ...(record.selectedSize?.name ? [['Size', record.selectedSize.name]] : []),
+              ...(record.selectedSize?.name ? [['Size', sizeLabel(record.selectedSize)]] : []),
+              ...(packagingLabel(record) ? [['Gift packaging', packagingLabel(record)]] : []),
               [
                 'Calculated price',
-                record.basePrice
-                  ? `${formatPrice(record.price)} (${formatPrice(record.basePrice)} base + components)`
+                record.basePrice || record.packagingPrice
+                  ? `${formatPrice(record.price)} (${[
+                      record.basePrice ? `${formatPrice(record.basePrice)} base` : null,
+                      record.packagingPrice ? `${formatPrice(record.packagingPrice)} packaging` : null,
+                      'components',
+                    ]
+                      .filter(Boolean)
+                      .join(' + ')})`
                   : formatPrice(record.price),
               ],
               ['Components', record.itemCount],

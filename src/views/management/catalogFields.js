@@ -20,6 +20,8 @@ export const emptyCatalogForm = {
   builderType: '',
   // APPAREL: the app-drawn garment shape shown until a product has its own images.
   silhouette: '',
+  // JEWELRY: BRACELET (sized by length) or NECKLACE (sized by component count).
+  jewelryShape: '',
   designCategoryId: '',
   name: '',
   description: '',
@@ -31,6 +33,8 @@ export const emptyCatalogForm = {
   price: 0,
   stock: 0,
   trackStock: true,
+  // Jewelry components: physical size in mm.
+  effectiveLengthMm: '',
 }
 
 export const builderLabels = {
@@ -65,36 +69,19 @@ export const sizeId = (name) =>
     .replace(/[^\p{L}\p{N}]+/gu, '-')
     .replace(/^-|-$/g, '')
 
-export const categorySizes = (sizes = []) => {
-  const ids = new Set()
-  return sizes.map((size, index) => {
-    const name = size.name.trim()
-    const id = size.id || sizeId(name)
-    const unit = size.unit.trim()
-    const measurement = Number(size.measurement)
-    const maxItems = Number(size.maxItems)
-    if (!name || !id) throw new Error(`Size ${index + 1}: name is required.`)
-    if (ids.has(id))
-      throw new Error('Size names must generate unique IDs. Rename the duplicate size.')
-    ids.add(id)
-    if (!unit) throw new Error(`Size ${index + 1}: unit is required.`)
-    if (!Number.isFinite(measurement) || measurement <= 0)
-      throw new Error(`Size ${index + 1}: measurement must be greater than zero.`)
-    if (!Number.isInteger(maxItems) || maxItems < 1 || maxItems > 2147483647)
-      throw new Error(`Size ${index + 1}: Max Items must be a positive whole number.`)
-    return { id, name, measurement, unit, maxItems }
-  })
-}
-
 export const categoryForm = (record) => {
   const form = Object.fromEntries(
     Object.entries(emptyCatalogForm).map(([key, fallback]) => [key, record?.[key] ?? fallback]),
   )
   form.silhouette = record?.builderConfig?.silhouette ?? ''
+  form.jewelryShape =
+    record?.builderType === 'JEWELRY' ? (isNecklaceCategory(record) ? 'NECKLACE' : 'BRACELET') : ''
+  if (form.jewelryShape) form.sizes = jewelryFormSizes(record?.sizes ?? [])
   return form
 }
 
-export const catalogPayload = (form, isSubCategory) => {
+/** `measuredComponent`: the component's category is jewelry, so it needs a physical size. */
+export const catalogPayload = (form, isSubCategory, measuredComponent = false) => {
   const nullable = (value) => value.trim() || null
   const payload = {
     name: form.name.trim(),
@@ -112,14 +99,102 @@ export const catalogPayload = (form, isSubCategory) => {
       stock: form.trackStock ? Number(form.stock) : Number(form.stock) || 0,
       trackStock: form.trackStock,
     })
-  else {
+  if (isSubCategory && measuredComponent) {
+    const length = Number(form.effectiveLengthMm)
+    if (!String(form.effectiveLengthMm).trim() || !Number.isInteger(length) || length < 1 || length > 1000)
+      throw new Error(
+        'Enter the physical size of this bead or component in whole millimetres, e.g. 8.',
+      )
+    payload.effectiveLengthMm = length
+  }
+  if (!isSubCategory) {
     payload.builderType = form.builderType || null
     payload.designCategoryId =
       form.builderType === 'APPAREL' ? form.designCategoryId || null : null
-    payload.sizes = form.builderType === 'JEWELRY' ? categorySizes(form.sizes ?? []) : null
+    // Jewelry (bracelets and necklaces) is sized by length ranges.
+    payload.sizes = form.builderType === 'JEWELRY' ? jewelrySizesPayload(form.sizes ?? []) : null
+    if (form.builderType === 'JEWELRY')
+      payload.builderConfig = { silhouette: form.jewelryShape || 'BRACELET' }
     // Colour and size live on each apparel product; the category only keeps the shape.
     if (form.builderType === 'APPAREL')
       payload.builderConfig = form.silhouette ? { silhouette: form.silhouette } : null
   }
   return payload
+}
+
+/** Jewelry (bracelets and necklaces) is sized by real length; its components are measured. */
+export const isJewelryCategory = (category) => category?.builderType === 'JEWELRY'
+
+/**
+ * Jewelry categories are necklaces when their shape says so; older categories without a
+ * shape are recognised by name, the same rule the app and API use. Other jewelry is a
+ * bracelet.
+ */
+export const isNecklaceCategory = (category) =>
+  category?.builderType === 'JEWELRY' &&
+  (category.builderConfig?.silhouette
+    ? category.builderConfig.silhouette === 'NECKLACE'
+    : /neck/i.test(category.name || ''))
+
+export const jewelryShapes = { BRACELET: 'Bracelet', NECKLACE: 'Necklace' }
+
+const cmText = (mm) => (Number.isFinite(mm) ? String(mm / 10) : '')
+
+/**
+ * Jewelry sizes as the form edits them, in centimetres. Sizes still in the old format
+ * (e.g. measurement 18, unit "24cm") are pre-filled from those values where they read
+ * clearly, and flagged so the admin checks them and sets the default length.
+ */
+export const jewelryFormSizes = (sizes = []) =>
+  sizes.map((size) => {
+    if (Number.isFinite(size.minMeasurementMm))
+      return {
+        id: size.id,
+        name: size.name,
+        minCm: cmText(size.minMeasurementMm),
+        maxCm: cmText(size.maxMeasurementMm),
+        defaultCm: cmText(size.defaultMeasurementMm),
+        converted: false,
+      }
+    const min = Number(size.measurement)
+    const max = Number(/^\s*(\d+(?:[.,]\d+)?)\s*cm\s*$/i.exec(size.unit || '')?.[1]?.replace(',', '.'))
+    return {
+      id: size.id,
+      name: size.name || '',
+      minCm: min > 0 ? String(min) : '',
+      maxCm: max > min ? String(max) : '',
+      defaultCm: '',
+      converted: true,
+    }
+  })
+
+/** Centimetres as typed ("18", "18.5", "18,5") to whole millimetres. */
+const cmToMm = (value, label) => {
+  const text = String(value ?? '').trim().replace(',', '.')
+  if (!/^\d+(?:\.\d)?$/.test(text))
+    throw new Error(`${label} must be a length in cm with at most one decimal, e.g. 18 or 18.5.`)
+  const mm = Math.round(Number(text) * 10)
+  if (mm <= 0 || mm > 1000) throw new Error(`${label} must be between 0.1 and 100 cm.`)
+  return mm
+}
+
+/** Validated jewelry sizes in millimetres; throws a readable Error. */
+export const jewelrySizesPayload = (sizes = []) => {
+  const ids = new Set()
+  return sizes.map((size, index) => {
+    const name = size.name.trim()
+    const id = size.id || sizeId(name)
+    const label = `Size ${index + 1}${name ? ` (${name})` : ''}`
+    if (!name || !id) throw new Error(`Size ${index + 1}: name is required.`)
+    if (ids.has(id)) throw new Error('Size names must be unique. Rename the duplicate size.')
+    ids.add(id)
+    const minMeasurementMm = cmToMm(size.minCm, `${label}: minimum`)
+    const maxMeasurementMm = cmToMm(size.maxCm, `${label}: maximum`)
+    const defaultMeasurementMm = cmToMm(size.defaultCm, `${label}: default length`)
+    if (maxMeasurementMm <= minMeasurementMm)
+      throw new Error(`${label}: the maximum must be longer than the minimum.`)
+    if (defaultMeasurementMm < minMeasurementMm || defaultMeasurementMm > maxMeasurementMm)
+      throw new Error(`${label}: the default length must be between the minimum and maximum.`)
+    return { id, name, minMeasurementMm, maxMeasurementMm, defaultMeasurementMm }
+  })
 }

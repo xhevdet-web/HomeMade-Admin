@@ -29,6 +29,8 @@ import {
   productDate,
   productImage,
 } from './productHelpers'
+import { packagingLabel } from '../giftPackaging/packagingHelpers'
+import { sizeLabel } from '../orders/orderHelpers'
 
 /** One line under the name: colour and sizes, or what a customer design was made on. */
 const productDetail = (product) =>
@@ -38,7 +40,8 @@ const productDetail = (product) =>
         .join(' · ')
     : [
         product.baseProduct ? `On ${product.baseProduct.name}` : null,
-        product.selectedSize?.name ? `Size ${product.selectedSize.name}` : null,
+        product.selectedSize?.name ? `Size ${sizeLabel(product.selectedSize)}` : null,
+        packagingLabel(product),
         `${product.itemCount ?? 0} components`,
       ]
         .filter(Boolean)

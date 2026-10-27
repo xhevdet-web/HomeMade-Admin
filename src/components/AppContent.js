@@ -9,6 +9,7 @@ const Users = React.lazy(() => import('../views/base/users/Users'))
 const CatalogPage = React.lazy(() => import('../views/management/CatalogPage'))
 const Products = React.lazy(() => import('../views/products/Products'))
 const Orders = React.lazy(() => import('../views/orders/Orders'))
+const GiftPackaging = React.lazy(() => import('../views/giftPackaging/GiftPackaging'))
 const Page404 = React.lazy(() => import('../views/pages/page404/Page404'))
 
 const AppContent = () => (
@@ -38,6 +39,8 @@ const AppContent = () => (
                   <Orders />
                 ) : route.name === 'Products' ? (
                   <Products />
+                ) : route.name === 'GiftPackaging' ? (
+                  <GiftPackaging />
                 ) : route.name === 'Categories' || route.name === 'SubCategories' ? (
                   <CatalogPage
                     key={route.id}

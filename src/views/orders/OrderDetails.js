@@ -37,6 +37,7 @@ import {
   isCompanyProduct,
   sizeLabel,
 } from './orderHelpers'
+import { packagingLabel } from '../giftPackaging/packagingHelpers'
 
 const Facts = ({ entries }) => (
   <dl className="hm-order-facts">
@@ -305,6 +306,23 @@ const OrderDetails = ({ id, initialDelete = false, onClose, onChanged, onDeleted
                     ['Product origin', orderProductLabel(order)],
                     ['Category', product?.category?.name],
                     ['Purchased size', sizeLabel(product?.selectedSize) || 'Size not recorded'],
+                    ...(packagingLabel(product)
+                      ? [
+                          [
+                            'Gift packaging',
+                            <span key="packaging" className="d-inline-flex align-items-center">
+                              {product.giftPackagingColor?.hex && (
+                                <span
+                                  className="hm-swatch"
+                                  aria-hidden="true"
+                                  style={{ backgroundColor: product.giftPackagingColor.hex }}
+                                />
+                              )}
+                              {packagingLabel(product)}
+                            </span>,
+                          ],
+                        ]
+                      : []),
                     [
                       readyMade ? 'Quantity' : 'Components',
                       readyMade ? '1 finished product' : `${product?.itemCount ?? 0} items`,

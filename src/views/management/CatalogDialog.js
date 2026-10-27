@@ -10,6 +10,8 @@ import {
   CFormLabel,
   CFormSelect,
   CFormTextarea,
+  CInputGroup,
+  CInputGroupText,
   CModal,
   CModalBody,
   CModalFooter,
@@ -23,8 +25,16 @@ import api, { apiErrorMessage } from '../../_helpers/api'
 import ProductImage from '../products/ProductImage'
 import ImagePicker from '../../components/ImagePicker'
 import { imageFormData } from '../../_helpers/imageUpload'
-import { catalogConfig, catalogPayload, categoryForm, emptyCatalogForm, typesFor } from './catalogFields'
-import CategorySizesEditor from './CategorySizesEditor'
+import {
+  catalogConfig,
+  catalogPayload,
+  categoryForm,
+  emptyCatalogForm,
+  isJewelryCategory,
+  jewelryShapes,
+  typesFor,
+} from './catalogFields'
+import JewelrySizesEditor from './JewelrySizesEditor'
 import { builderLabels } from './catalogFields'
 import { silhouettes } from '../apparel/apparelHelpers'
 
@@ -108,6 +118,8 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
       builderType,
       sizes: [],
       silhouette: builderType === 'APPAREL' ? previous.silhouette || 'HOODIE' : '',
+      jewelryShape:
+        builderType === 'JEWELRY' ? (/neck/i.test(previous.name) ? 'NECKLACE' : 'BRACELET') : '',
       designCategoryId: builderType === 'APPAREL' ? previous.designCategoryId : '',
     }))
   }
@@ -135,7 +147,7 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
       else {
         let fields
         try {
-          fields = catalogPayload(form, isSubCategory)
+          fields = catalogPayload(form, isSubCategory, measuredComponent)
         } catch (validationError) {
           setError(validationError.message)
           return
@@ -185,6 +197,15 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
   const componentTypes = typesFor(
     categories.find((category) => category.id === form.categoryId)?.builderType,
   )
+  // Jewelry components are measured: their physical size fills the piece's length.
+  const measuredComponent =
+    isSubCategory &&
+    isJewelryCategory(categories.find((category) => category.id === form.categoryId))
+  const changeJewelryShape = (event) => {
+    const jewelryShape = event.target.value
+    setForm((previous) => ({ ...previous, jewelryShape }))
+  }
+
   // A saved type outside the category's choices is shown as free text.
   const showCustomType = customType || (!!form.type && !componentTypes[form.type])
   const title = `${action.mode === 'view' ? '' : action.mode === 'create' ? 'Create ' : action.mode === 'edit' ? 'Edit ' : 'Delete '}${singular}${action.mode === 'view' ? ' details' : ''}`
@@ -197,6 +218,16 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
           ['Type', record?.type],
           ['Price (cents)', record?.price],
           ['Stock', record?.trackStock === false ? 'Unlimited (printed design)' : record?.stock],
+          ...(isJewelryCategory(record?.category)
+            ? [
+                [
+                  'Physical size',
+                  record?.effectiveLengthMm
+                    ? `${record.effectiveLengthMm} mm`
+                    : 'Physical size required',
+                ],
+              ]
+            : []),
         ]
       : [
           ['Builder type', builderLabels[record?.builderType] || 'Not configured'],
@@ -295,12 +326,23 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                     <section className="mt-4">
                       <h3>Sizes</h3>
                       {record?.sizes?.length ? (
-                        record.sizes.map((size) => (
-                          <p key={size.id}>
-                            <strong>{size.name}</strong> · {size.measurement} {size.unit} · Max
-                            Items: {size.maxItems}
-                          </p>
-                        ))
+                        record.sizes.map((size) =>
+                          Number.isFinite(size.minMeasurementMm) ? (
+                            <p key={size.id}>
+                              <strong>{size.name}</strong> · {size.minMeasurementMm / 10}–
+                              {size.maxMeasurementMm / 10} cm · default {size.defaultMeasurementMm / 10}{' '}
+                              cm
+                            </p>
+                          ) : (
+                            <p key={size.id}>
+                              <strong>{size.name}</strong> · {size.measurement} {size.unit} · Max
+                              Items: {size.maxItems}
+                              {isJewelryCategory(record) && (
+                                <span className="hm-badge ms-2">Old format: edit to set lengths</span>
+                              )}
+                            </p>
+                          ),
+                        )
                       ) : (
                         <p className="hm-muted">No sizes</p>
                       )}
@@ -376,6 +418,26 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                             <option value={value} key={value}>{label}</option>
                           ))}
                         </CFormSelect>
+                      </CCol>
+                    )}
+                    {!isSubCategory && form.builderType === 'JEWELRY' && (
+                      <CCol xs={12} md={6}>
+                        <CFormLabel htmlFor="catalog-jewelryShape">Jewelry type</CFormLabel>
+                        <CFormSelect
+                          id="catalog-jewelryShape"
+                          value={form.jewelryShape || 'BRACELET'}
+                          onChange={changeJewelryShape}
+                          aria-describedby="catalog-jewelryShape-help"
+                        >
+                          {Object.entries(jewelryShapes).map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </CFormSelect>
+                        <small id="catalog-jewelryShape-help" className="hm-muted">
+                          Decides the shape drawn in the studio. Both are sized by length in cm.
+                        </small>
                       </CCol>
                     )}
                     {!isSubCategory && form.builderType === 'APPAREL' && (
@@ -506,6 +568,32 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                             />
                           )}
                         </CCol>
+                        {measuredComponent && (
+                          <CCol md={6}>
+                            <CFormLabel htmlFor="catalog-effectiveLengthMm">Physical size</CFormLabel>
+                            <CInputGroup>
+                              <CFormInput
+                                id="catalog-effectiveLengthMm"
+                                name="effectiveLengthMm"
+                                type="number"
+                                inputMode="numeric"
+                                min={1}
+                                max={1000}
+                                step={1}
+                                required
+                                placeholder="e.g. 8"
+                                aria-describedby="catalog-effectiveLengthMm-help"
+                                value={form.effectiveLengthMm}
+                                onChange={change}
+                              />
+                              <CInputGroupText>mm</CInputGroupText>
+                            </CInputGroup>
+                            <small id="catalog-effectiveLengthMm-help" className="hm-muted">
+                              Enter the physical size of this bead or component: how much length one
+                              piece occupies on the bracelet or necklace.
+                            </small>
+                          </CCol>
+                        )}
                         {input('price', 'Price (cents)', integer)}
                         {form.trackStock ? (
                           input('stock', 'Stock', integer)
@@ -544,8 +632,10 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                       />
                     </CCol>
                   </CRow>
+                  {/* Bracelets and necklaces are sized by length ranges. */}
                   {!isSubCategory && form.builderType === 'JEWELRY' && (
-                    <CategorySizesEditor
+                    <JewelrySizesEditor
+                      piece={form.jewelryShape === 'NECKLACE' ? 'necklace' : 'bracelet'}
                       sizes={form.sizes}
                       onChange={(sizes) => setForm((previous) => ({ ...previous, sizes }))}
                     />

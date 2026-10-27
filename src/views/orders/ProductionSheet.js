@@ -9,6 +9,7 @@ import {
   textMeasurements,
   textStyleLabel,
 } from '../apparel/apparelHelpers'
+import { sizeLabel } from './orderHelpers'
 
 const sides = [
   ['FRONT', 'front', 'Front'],
@@ -54,7 +55,7 @@ const ProductionSheet = ({ product, orderNumber }) => {
       <p className="hm-production-meta">
         {orderNumber} · {base.name}
         {base.color ? ` · ${base.color}` : ''}
-        {product?.selectedSize?.name ? ` · Size ${product.selectedSize.name}` : ''}
+        {product?.selectedSize?.name ? ` · Size ${sizeLabel(product.selectedSize)}` : ''}
       </p>
       {sides.map(([side, key, label]) => {
         const items = placed.filter((item) => item.side === side)

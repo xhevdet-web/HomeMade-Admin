@@ -18,6 +18,8 @@ const navigation = [
   item('Products', 'Products', '/products', 'cilStar'),
   item('Components', 'Components', '/components', 'cilPuzzle'),
   item('Designs', 'Designs', '/designs', 'cilPencil'),
+  heading('Gift'),
+  item('GiftPackaging', 'Packaging', '/gift-packaging', 'cilGift'),
   heading('Sales'),
   item('Orders', 'Orders', '/orders', 'cilClipboard'),
 ]

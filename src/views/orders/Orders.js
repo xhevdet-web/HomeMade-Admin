@@ -34,6 +34,7 @@ import {
   orderProductLabel,
   isCompanyProduct,
   originLabels,
+  sizeLabel,
 } from './orderHelpers'
 
 const emptyFilters = {
@@ -380,7 +381,7 @@ const Orders = () => {
                           {!isCompanyProduct(orderedProduct(order)) &&
                             ` · ${orderedProduct(order)?.itemCount ?? 0} components`}
                           {orderedProduct(order)?.selectedSize?.name &&
-                            ` · Size ${orderedProduct(order).selectedSize.name}`}
+                            ` · Size ${sizeLabel(orderedProduct(order).selectedSize)}`}
                         </small>
                       </div>
                     </CTableDataCell>

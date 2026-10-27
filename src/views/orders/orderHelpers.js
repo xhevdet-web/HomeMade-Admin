@@ -55,6 +55,13 @@ export const orderDesignImage = (order) => {
     ? product.imageUrl
     : order?.designPreviewUrl ?? product?.designPreviewUrl
 }
-/** "L", or "Medium · 18 cm" for a jewelry size preset. */
+/**
+ * "L"; "Medium · 20 cm" for a bracelet made to an exact length (stored in mm); or
+ * "Medium · 18 cm" for an older jewelry size preset.
+ */
 export const sizeLabel = (size) =>
-  size?.name ? `${size.name}${size.measurement ? ` · ${size.measurement} ${size.unit}` : ''}` : null
+  !size?.name
+    ? null
+    : Number.isFinite(size.selectedMeasurementMm)
+      ? `${size.name} · ${size.selectedMeasurementMm / 10} cm`
+      : `${size.name}${size.measurement ? ` · ${size.measurement} ${size.unit}` : ''}`
