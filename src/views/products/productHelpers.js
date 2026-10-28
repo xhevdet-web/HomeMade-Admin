@@ -6,6 +6,7 @@ import {
   sizeRows,
   sizesPayload,
 } from '../apparel/apparelHelpers'
+import { caseAreaPayload, defaultCameraArea, defaultCaseArea } from '../cases/caseHelpers'
 
 export const formatPrice = (cents) =>
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(cents / 100)
@@ -49,6 +50,12 @@ export const emptyProductForm = (categoryId = '', apparel = false) => ({
   backEnabled: false,
   frontPrintArea: defaultPrintArea('front'),
   backPrintArea: defaultPrintArea('back'),
+  // Phone case models: brand, catalog order, printable area and camera opening.
+  deviceBrand: '',
+  sortOrder: '0',
+  caseArea: defaultCaseArea(),
+  cameraEnabled: true,
+  cameraArea: defaultCameraArea(),
   isActive: true,
 })
 
@@ -66,11 +73,16 @@ export const productForm = (product) => ({
   backEnabled: !!product.printAreas?.back,
   frontPrintArea: { ...(product.printAreas?.front || defaultPrintArea('front')) },
   backPrintArea: { ...(product.printAreas?.back || defaultPrintArea('back')) },
+  deviceBrand: product.deviceBrand ?? '',
+  sortOrder: String(product.sortOrder ?? 0),
+  caseArea: { ...(product.printAreas?.front || defaultCaseArea()) },
+  cameraEnabled: !product.printAreas || !!product.printAreas.camera,
+  cameraArea: { ...(product.printAreas?.camera || defaultCameraArea()) },
   isActive: product.isActive ?? true,
 })
 
 /** Validated COMPANY product fields; throws a readable Error. */
-export const companyPayload = (form, apparel) => {
+export const companyPayload = (form, apparel, phoneCase = false) => {
   if (!form.name.trim()) throw new Error('Name is required.')
   const fields = {
     categoryId: form.categoryId,
@@ -97,6 +109,18 @@ export const companyPayload = (form, apparel) => {
     const front = form.frontEnabled ? printAreaPayload(form.frontPrintArea, 'Front print area') : null
     const back = form.backEnabled ? printAreaPayload(form.backPrintArea, 'Back print area') : null
     fields.printAreas = front || back ? { ...(front ? { front } : {}), ...(back ? { back } : {}) } : null
+  }
+  if (phoneCase) {
+    if (!form.deviceBrand) throw new Error('Choose the brand of this phone model.')
+    const sortOrder = Number(form.sortOrder)
+    if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 1000000)
+      throw new Error('Sort order must be a nonnegative whole number.')
+    fields.deviceBrand = form.deviceBrand
+    fields.sortOrder = sortOrder
+    fields.printAreas = {
+      front: caseAreaPayload(form.caseArea),
+      ...(form.cameraEnabled ? { camera: caseAreaPayload(form.cameraArea) } : {}),
+    }
   }
   return fields
 }

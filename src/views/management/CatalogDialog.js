@@ -104,6 +104,15 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
       [name]: type === 'checkbox' ? checked : value,
     }))
   }
+  // New phone case artwork is printed on demand, so it starts without stock tracking.
+  const changeParent = (event) => {
+    const parent = categories.find((category) => category.id === event.target.value)
+    setForm((previous) => ({
+      ...previous,
+      categoryId: event.target.value,
+      ...(action.mode === 'create' && parent?.builderType === 'CASE' ? { trackStock: false } : {}),
+    }))
+  }
   const changeBuilderType = (event) => {
     const builderType = event.target.value
     const hasConfiguration = form.sizes?.length > 0
@@ -376,7 +385,7 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                           name="categoryId"
                           required
                           value={form.categoryId}
-                          onChange={change}
+                          onChange={changeParent}
                           disabled={!categories.length}
                         >
                           <option value="">Select a category</option>

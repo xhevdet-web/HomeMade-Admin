@@ -42,6 +42,7 @@ export const builderLabels = {
   APPAREL: 'Apparel',
   BOUQUET: 'Bouquet',
   GIFT: 'Gift',
+  CASE: 'Phone cases',
 }
 
 // Component types per studio. The app uses them for its picker filters (Flowers, Greenery,
@@ -56,6 +57,8 @@ const componentTypes = {
     WRAPPING: 'Wrapping',
   },
   GIFT: { BAG: 'Bag & box', FILLER: 'Filler', ITEM: 'Item', DECORATION: 'Decoration' },
+  // Case artwork is digital: printed full-bleed, never stocked or measured.
+  CASE: { ILLUSTRATION: 'Illustration', PATTERN: 'Pattern', PHOTO: 'Photo', LOGO: 'Logo' },
 }
 /** Type choices for a component of a category with this builder; free text is always allowed. */
 export const typesFor = (builderType) => componentTypes[builderType] || {}

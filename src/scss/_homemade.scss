@@ -1434,6 +1434,35 @@ body {
 .hm-print-area.is-editable {
   cursor: move;
 }
+// Phone case templates: the overlay drawn above artwork, and passive guides (camera).
+.hm-mockup > .hm-mockup-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.hm-print-guide {
+  position: absolute;
+  border: 2px dashed var(--hm-steel);
+  background: rgba(60, 72, 88, 0.18);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hm-print-guide span {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--hm-text);
+  background: var(--hm-surface);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+.hm-case-mockup .hm-mockup {
+  max-width: 260px;
+}
 .hm-print-area.is-editable:focus-visible {
   outline: 3px solid var(--hm-steel);
   outline-offset: 2px;

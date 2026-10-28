@@ -1,6 +1,8 @@
 import PropTypes from 'prop-types'
 
 const sideLabels = { FRONT: 'Front', BACK: 'Back' }
+// Apparel artwork is PNG; phone case photos may also be JPEG or WebP.
+const extension = (url) => /\.(png|jpe?g|webp)$/i.exec(url.split('?')[0])?.[0] || '.png'
 
 /**
  * The customer's own uploaded images, exactly as uploaded, so they can be checked and
@@ -45,7 +47,7 @@ const UploadedArtwork = ({ product }) => {
                   <a href={upload.url} target="_blank" rel="noopener noreferrer">
                     Open full size
                   </a>
-                  <a href={upload.url} download={`artwork-${index + 1}.png`}>
+                  <a href={upload.url} download={`artwork-${index + 1}${extension(upload.url)}`}>
                     Download
                   </a>
                 </span>

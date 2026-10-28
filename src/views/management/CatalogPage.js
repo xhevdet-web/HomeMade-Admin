@@ -34,6 +34,8 @@ const configurationSummary = (record) => {
   }
   if (record.builderType === 'APPAREL')
     return `${silhouettes[record.builderConfig?.silhouette] || 'No'} silhouette`
+  // Phone models (template, print area, price, stock) are managed as its products.
+  if (record.builderType === 'CASE') return 'Phone models on Products'
   return record.builderType ? 'Studio ready' : 'Not configured'
 }
 

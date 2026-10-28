@@ -40,6 +40,8 @@ import {
   productFormData,
 } from './productHelpers'
 import { packagingLabel } from '../giftPackaging/packagingHelpers'
+import CaseTemplateEditor from '../cases/CaseTemplateEditor'
+import { brandLabel, deviceBrands, isCase } from '../cases/caseHelpers'
 import { sizeLabel } from '../orders/orderHelpers'
 
 const useObjectUrl = (file) => {
@@ -76,11 +78,14 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
   const [attempt, setAttempt] = useState(0)
   const [image, setImage] = useState(null)
   const [backImage, setBackImage] = useState(null)
+  const [overlayImage, setOverlayImage] = useState(null)
+  const [removeOverlay, setRemoveOverlay] = useState(false)
   const submitting = useRef(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const imagePreview = useObjectUrl(image)
   const backPreview = useObjectUrl(backImage)
+  const overlayPreview = useObjectUrl(overlayImage)
 
   useEffect(() => {
     if (action.mode === 'create') return
@@ -108,6 +113,8 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
   const company = action.mode === 'create' || isCompany(record)
   const category = categories.find((entry) => entry.id === form.categoryId)
   const apparel = isApparel(category ?? record?.category)
+  // Phone case models: one product per model, with its own template and overlay.
+  const phoneCase = isCase(category ?? record?.category)
   const silhouette = (category ?? record?.category)?.builderConfig?.silhouette
   const frontSrc = imagePreview || record?.imageUrl
   const backSrc = backPreview || record?.backImageUrl || frontSrc
@@ -157,13 +164,23 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
         if (!categories.some((entry) => entry.id === form.categoryId))
           throw new Error('Select a category.')
         if (action.mode === 'create' && !image) throw new Error('Choose an image for the product.')
-        for (const file of [image, backImage]) {
+        for (const file of [image, backImage, overlayImage]) {
           const invalid = validateImageFile(file)
           if (invalid) throw new Error(invalid)
         }
-        const fields = companyPayload(form, apparel)
-        const files = { file: image, ...(apparel ? { backImage } : {}) }
-        const timeout = image || backImage ? 120000 : 15000
+        if (phoneCase && overlayImage && overlayImage.type !== 'image/png')
+          throw new Error('The overlay must be a transparent PNG.')
+        const fields = companyPayload(form, apparel, phoneCase)
+        // Case templates stay untouched so the overlay and areas line up with them.
+        if (phoneCase && image) fields.removeBackground = false
+        if (phoneCase && removeOverlay && !overlayImage && action.mode === 'edit')
+          fields.removeOverlay = true
+        const files = {
+          file: image,
+          ...(apparel ? { backImage } : {}),
+          ...(phoneCase ? { overlayImage } : {}),
+        }
+        const timeout = image || backImage || overlayImage ? 120000 : 15000
         request =
           action.mode === 'create'
             ? () =>
@@ -210,6 +227,7 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
         ...(company
           ? [
               ['Price', formatPrice(record.price)],
+              ...(record.deviceBrand ? [['Brand', brandLabel(record.deviceBrand)]] : []),
               ...(record.color ? [['Colour', record.color]] : []),
               ...(record.sizes?.length ? [] : [['Available stock', record.stock]]),
             ]
@@ -247,7 +265,9 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
           maxLength={200}
           value={form.name}
           onChange={change}
-          placeholder={apparel ? 'e.g. Black Essential Hoodie' : undefined}
+          placeholder={
+            apparel ? 'e.g. Black Essential Hoodie' : phoneCase ? 'e.g. iPhone 14' : undefined
+          }
         />
       </CCol>
       <CCol xs={12}>
@@ -319,6 +339,17 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
                         <figcaption>{record?.backImageUrl ? 'Front' : 'Product image'}</figcaption>
                         <ProductImage src={record?.imageUrl} name={record?.name} transparent large />
                       </figure>
+                      {record?.overlayImageUrl && (
+                        <figure>
+                          <figcaption>Overlay</figcaption>
+                          <ProductImage
+                            src={record.overlayImageUrl}
+                            name={`${record.name} overlay`}
+                            transparent
+                            large
+                          />
+                        </figure>
+                      )}
                       {record?.backImageUrl && (
                         <figure>
                           <figcaption>Back</figcaption>
@@ -438,6 +469,46 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
                         onChange={change}
                       />
                     </CCol>
+                    {phoneCase && (
+                      <>
+                        <CCol md={3}>
+                          <CFormLabel htmlFor="product-deviceBrand">Brand</CFormLabel>
+                          <CFormSelect
+                            id="product-deviceBrand"
+                            name="deviceBrand"
+                            required
+                            value={form.deviceBrand}
+                            onChange={change}
+                          >
+                            <option value="">Select a brand</option>
+                            {form.deviceBrand && !deviceBrands[form.deviceBrand] && (
+                              <option value={form.deviceBrand}>{brandLabel(form.deviceBrand)}</option>
+                            )}
+                            {Object.entries(deviceBrands).map(([value, label]) => (
+                              <option value={value} key={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </CFormSelect>
+                        </CCol>
+                        <CCol md={3}>
+                          <CFormLabel htmlFor="product-sortOrder">Sort order</CFormLabel>
+                          <CFormInput
+                            id="product-sortOrder"
+                            name="sortOrder"
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={form.sortOrder}
+                            onChange={change}
+                            aria-describedby="product-sortOrder-help"
+                          />
+                          <small id="product-sortOrder-help" className="hm-muted">
+                            Lower shows first within its brand.
+                          </small>
+                        </CCol>
+                      </>
+                    )}
                     {apparel && (
                       <CCol md={6}>
                         <CFormLabel htmlFor="product-color">Colour</CFormLabel>
@@ -491,7 +562,7 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
                         </CCol>
                       )}
                     </CCol>
-                    <CCol md={apparel ? 6 : 12}>
+                    <CCol md={apparel || phoneCase ? 6 : 12}>
                       <ImagePicker
                         id="product-image"
                         file={image}
@@ -499,10 +570,43 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
                         imageUrl={record?.imageUrl}
                         name={form.name}
                         required={action.mode === 'create'}
-                        processBackground
-                        label={apparel ? 'Product image (front)' : undefined}
+                        processBackground={!phoneCase}
+                        label={
+                          apparel
+                            ? 'Product image (front)'
+                            : phoneCase
+                              ? 'Case template (required)'
+                              : undefined
+                        }
+                        hint={
+                          phoneCase
+                            ? 'The empty back of this exact model, ideally a transparent PNG. Stored untouched.'
+                            : undefined
+                        }
                       />
                     </CCol>
+                    {phoneCase && (
+                      <CCol md={6}>
+                        <ImagePicker
+                          id="product-overlay-image"
+                          file={overlayImage}
+                          onChange={setOverlayImage}
+                          imageUrl={record?.overlayImageUrl}
+                          name={`${form.name} overlay`}
+                          label="Overlay (optional)"
+                          hint="Transparent PNG the same size as the template: only the edges and camera island visible, drawn above the customer image. Most models do not need one."
+                        />
+                        {record?.overlayImageUrl && !overlayImage && (
+                          <CFormCheck
+                            className="mt-2"
+                            id="product-remove-overlay"
+                            label="Remove the current overlay"
+                            checked={removeOverlay}
+                            onChange={(event) => setRemoveOverlay(event.target.checked)}
+                          />
+                        )}
+                      </CCol>
+                    )}
                     {apparel && (
                       <CCol md={6}>
                         <ImagePicker
@@ -519,6 +623,20 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
                     )}
                     {activeField}
                   </CRow>
+                  {phoneCase && (
+                    <section className="mt-4" aria-label="Case template">
+                      <CaseTemplateEditor
+                        src={imagePreview || record?.imageUrl}
+                        overlaySrc={overlayPreview || (removeOverlay ? null : record?.overlayImageUrl)}
+                        area={form.caseArea}
+                        camera={form.cameraArea}
+                        cameraEnabled={form.cameraEnabled}
+                        onAreaChange={setField('caseArea')}
+                        onCameraChange={setField('cameraArea')}
+                        onCameraEnabled={setField('cameraEnabled')}
+                      />
+                    </section>
+                  )}
                   {apparel && (
                     <section className="mt-4" aria-label="Print areas">
                       <h4>Studio print areas</h4>
@@ -573,7 +691,7 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
                   <CSpinner size="sm" aria-hidden="true" className="me-2" />
                   {action.mode === 'delete'
                     ? 'Deleting...'
-                    : image || backImage
+                    : image || backImage || overlayImage
                       ? 'Saving and processing image...'
                       : 'Saving...'}
                 </>

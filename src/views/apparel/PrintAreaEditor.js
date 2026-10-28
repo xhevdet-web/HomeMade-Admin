@@ -7,8 +7,22 @@ import { clampArea, defaultPrintArea } from './apparelHelpers'
 const handles = ['nw', 'ne', 'sw', 'se']
 const percent = (value) => Math.round(Number(value) * 1000) / 10
 
-/** Mockup with a draggable, resizable print rectangle stored as fractions of the image. */
-export const MockupCanvas = ({ src, silhouette, side, area, onChange, children }) => {
+/**
+ * Mockup with a draggable, resizable print rectangle stored as fractions of the image.
+ * Phone case templates also stack their overlay (`overlaySrc`), round the area's corners
+ * (`areaStyle`) and show other areas, such as the camera, as passive `guides`.
+ */
+export const MockupCanvas = ({
+  src,
+  silhouette,
+  side,
+  area,
+  onChange,
+  children,
+  overlaySrc,
+  areaStyle,
+  guides = [],
+}) => {
   const frame = useRef(null)
   const drag = useRef(null)
   const start = (mode) => (event) => {
@@ -73,6 +87,31 @@ export const MockupCanvas = ({ src, silhouette, side, area, onChange, children }
       ) : (
         <GarmentSilhouette silhouette={silhouette} side={side} />
       )}
+      {overlaySrc && (
+        <img
+          className="hm-mockup-overlay"
+          src={overlaySrc}
+          alt=""
+          referrerPolicy="no-referrer"
+          draggable={false}
+        />
+      )}
+      {guides.map((guide) => (
+        <div
+          key={guide.key}
+          className="hm-print-guide"
+          aria-hidden="true"
+          style={{
+            left: `${guide.area.x * 100}%`,
+            top: `${guide.area.y * 100}%`,
+            width: `${guide.area.width * 100}%`,
+            height: `${guide.area.height * 100}%`,
+            ...guide.style,
+          }}
+        >
+          {guide.label && <span>{guide.label}</span>}
+        </div>
+      ))}
       {area && (
         <div
           className={`hm-print-area${onChange ? ' is-editable' : ''}`}
@@ -81,6 +120,7 @@ export const MockupCanvas = ({ src, silhouette, side, area, onChange, children }
             top: `${area.y * 100}%`,
             width: `${area.width * 100}%`,
             height: `${area.height * 100}%`,
+            ...areaStyle,
           }}
           {...(onChange
             ? {
@@ -115,6 +155,16 @@ MockupCanvas.propTypes = {
   area: PropTypes.object,
   onChange: PropTypes.func,
   children: PropTypes.node,
+  overlaySrc: PropTypes.string,
+  areaStyle: PropTypes.object,
+  guides: PropTypes.arrayOf(
+    PropTypes.shape({
+      key: PropTypes.string.isRequired,
+      area: PropTypes.object.isRequired,
+      label: PropTypes.string,
+      style: PropTypes.object,
+    }),
+  ),
 }
 
 const PrintAreaEditor = ({ side, label, src, silhouette, enabled, area, onEnabled, onChange }) => {

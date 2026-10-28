@@ -31,11 +31,16 @@ import {
 } from './productHelpers'
 import { packagingLabel } from '../giftPackaging/packagingHelpers'
 import { sizeLabel } from '../orders/orderHelpers'
+import { brandLabel } from '../cases/caseHelpers'
 
 /** One line under the name: colour and sizes, or what a customer design was made on. */
 const productDetail = (product) =>
   isCompany(product)
-    ? [product.color, product.sizes?.length ? `${product.sizes.length} sizes` : null]
+    ? [
+        product.deviceBrand ? brandLabel(product.deviceBrand) : null,
+        product.color,
+        product.sizes?.length ? `${product.sizes.length} sizes` : null,
+      ]
         .filter(Boolean)
         .join(' · ')
     : [

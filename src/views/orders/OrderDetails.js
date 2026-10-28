@@ -23,6 +23,7 @@ import { formatPrice } from '../products/productHelpers'
 import OrderBadge from './OrderBadge'
 import ProductionSheet from './ProductionSheet'
 import UploadedArtwork from './UploadedArtwork'
+import CaseProductionDetails from './CaseProductionDetails'
 import {
   nextStatus,
   orderDate,
@@ -347,6 +348,7 @@ const OrderDetails = ({ id, initialDelete = false, onClose, onChanged, onDeleted
               </section>
               <UploadedArtwork product={product} />
               <ProductionSheet product={product} orderNumber={order.orderNumber} />
+              <CaseProductionDetails product={product} />
               <section className="hm-order-section">
                 <h3>Customer notes</h3>
                 <p className="hm-order-text">{order.customerNotes || 'No customer notes.'}</p>
