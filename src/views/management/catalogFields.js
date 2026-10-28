@@ -112,8 +112,8 @@ export const catalogPayload = (form, isSubCategory, measuredComponent = false) =
   }
   if (!isSubCategory) {
     payload.builderType = form.builderType || null
-    payload.designCategoryId =
-      form.builderType === 'APPAREL' ? form.designCategoryId || null : null
+    // Any studio may share another category's subcategories (e.g. beads for bracelets and necklaces).
+    payload.designCategoryId = form.builderType ? form.designCategoryId || null : null
     // Jewelry (bracelets and necklaces) is sized by length ranges.
     payload.sizes = form.builderType === 'JEWELRY' ? jewelrySizesPayload(form.sizes ?? []) : null
     if (form.builderType === 'JEWELRY')

@@ -129,7 +129,8 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
       silhouette: builderType === 'APPAREL' ? previous.silhouette || 'HOODIE' : '',
       jewelryShape:
         builderType === 'JEWELRY' ? (/neck/i.test(previous.name) ? 'NECKLACE' : 'BRACELET') : '',
-      designCategoryId: builderType === 'APPAREL' ? previous.designCategoryId : '',
+      // A library must be the same kind of studio, so a new builder type starts without one.
+      designCategoryId: '',
     }))
   }
   const submit = async (event) => {
@@ -248,7 +249,7 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                 ? `${silhouettes[record?.builderConfig?.silhouette] || 'No'} silhouette · colours and sizes per product`
                 : 'Not configured',
           ],
-          ...(record?.builderType === 'APPAREL'
+          ...(record?.builderType
             ? [
                 [
                   'Design library',
@@ -472,7 +473,7 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                         </small>
                       </CCol>
                     )}
-                    {!isSubCategory && form.builderType === 'APPAREL' && (
+                    {!isSubCategory && !!form.builderType && (
                       <CCol xs={12}>
                         <CFormLabel htmlFor="catalog-designCategoryId">Design library</CFormLabel>
                         <CFormSelect
@@ -484,21 +485,29 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                         >
                           <option value="">None</option>
                           {categories
-                            // A library cannot be this category or itself use a library.
+                            // A library is the same kind of studio (or has none) and is not this
+                            // category. One that uses a library itself is shown, but cannot be chosen.
                             .filter(
                               (category) =>
                                 category.id !== action.id &&
-                                (!category.designCategoryId || category.id === form.designCategoryId),
+                                (!category.builderType || category.builderType === form.builderType),
                             )
-                            .map((category) => (
-                              <option key={category.id} value={category.id}>
-                                {category.name}
-                              </option>
-                            ))}
+                            .map((category) => {
+                              const chained =
+                                !!category.designCategoryId && category.id !== form.designCategoryId
+                              return (
+                                <option key={category.id} value={category.id} disabled={chained}>
+                                  {category.name}
+                                  {chained ? ' (uses a design library itself; set its library to None first)' : ''}
+                                </option>
+                              )
+                            })}
                         </CFormSelect>
                         <small id="catalog-designCategoryId-help" className="hm-muted">
-                          Also offer the designs of this category, e.g. a shared Apparel Designs
-                          category for Hoodies and T-Shirts.
+                          Also offer the subcategories of this category, so shared pieces are added
+                          once: e.g. a &quot;Beads&quot; category used by both Bracelet and Necklace, or
+                          Apparel Designs for Hoodies and T-Shirts. Set that library category to
+                          inactive to keep it out of the app&apos;s category list.
                         </small>
                       </CCol>
                     )}
