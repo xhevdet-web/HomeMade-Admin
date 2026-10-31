@@ -35,7 +35,10 @@ import {
   typesFor,
 } from './catalogFields'
 import JewelrySizesEditor from './JewelrySizesEditor'
+import StickerSizesEditor from './StickerSizesEditor'
+import { stickerShapes, stickerSizeLabel } from './stickerSizes'
 import { builderLabels } from './catalogFields'
+import { formatPrice } from '../products/productHelpers'
 import { silhouettes } from '../apparel/apparelHelpers'
 
 const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
@@ -104,13 +107,15 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
       [name]: type === 'checkbox' ? checked : value,
     }))
   }
-  // New phone case artwork is printed on demand, so it starts without stock tracking.
+  // New phone case and sticker artwork is printed on demand, so it starts without stock tracking.
   const changeParent = (event) => {
     const parent = categories.find((category) => category.id === event.target.value)
     setForm((previous) => ({
       ...previous,
       categoryId: event.target.value,
-      ...(action.mode === 'create' && parent?.builderType === 'CASE' ? { trackStock: false } : {}),
+      ...(action.mode === 'create' && ['CASE', 'STICKER'].includes(parent?.builderType)
+        ? { trackStock: false }
+        : {}),
     }))
   }
   const changeBuilderType = (event) => {
@@ -243,7 +248,7 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
           ['Builder type', builderLabels[record?.builderType] || 'Not configured'],
           [
             'Configuration',
-            record?.builderType === 'JEWELRY'
+            record?.builderType === 'JEWELRY' || record?.builderType === 'STICKER'
               ? `${record?.sizes?.length || 0} sizes`
               : record?.builderType === 'APPAREL'
                 ? `${silhouettes[record?.builderConfig?.silhouette] || 'No'} silhouette · colours and sizes per product`
@@ -331,6 +336,21 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                         Download original upload
                       </a>
                     </p>
+                  )}
+                  {!isSubCategory && record?.builderType === 'STICKER' && (
+                    <section className="mt-4">
+                      <h3>Sticker sizes</h3>
+                      {record?.sizes?.length ? (
+                        record.sizes.map((size) => (
+                          <p key={size.id}>
+                            <strong>{stickerShapes[size.shape] || size.shape}</strong> ·{' '}
+                            {stickerSizeLabel(size)} · {formatPrice(size.price ?? 0)} per sticker
+                          </p>
+                        ))
+                      ) : (
+                        <p className="hm-muted">No sizes: customers cannot create stickers yet</p>
+                      )}
+                    </section>
                   )}
                   {!isSubCategory && record?.builderType === 'JEWELRY' && (
                     <section className="mt-4">
@@ -650,6 +670,13 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
                       />
                     </CCol>
                   </CRow>
+                  {/* Stickers are offered in these shapes and sizes, priced per sticker. */}
+                  {!isSubCategory && form.builderType === 'STICKER' && (
+                    <StickerSizesEditor
+                      sizes={form.sizes}
+                      onChange={(sizes) => setForm((previous) => ({ ...previous, sizes }))}
+                    />
+                  )}
                   {/* Bracelets and necklaces are sized by length ranges. */}
                   {!isSubCategory && form.builderType === 'JEWELRY' && (
                     <JewelrySizesEditor

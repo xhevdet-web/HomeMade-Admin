@@ -394,6 +394,7 @@ const Orders = () => {
                     </CTableDataCell>
                     <CTableDataCell className="text-nowrap">
                       {formatPrice(order.totalPrice)}
+                      {order.quantity > 1 && <small className="d-block hm-muted">× {order.quantity}</small>}
                     </CTableDataCell>
                     <CTableDataCell>
                       {paymentTypes[order.paymentType] || order.paymentType}

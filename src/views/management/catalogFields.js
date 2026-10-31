@@ -1,4 +1,5 @@
 import { designTypes } from '../apparel/apparelHelpers'
+import { stickerFormSizes, stickerSizesPayload } from './stickerSizes'
 
 export const catalogConfig = {
   categories: {
@@ -43,6 +44,7 @@ export const builderLabels = {
   BOUQUET: 'Bouquet',
   GIFT: 'Gift',
   CASE: 'Phone cases',
+  STICKER: 'Stickers',
 }
 
 // Component types per studio. The app uses them for its picker filters (Flowers, Greenery,
@@ -59,6 +61,8 @@ const componentTypes = {
   GIFT: { BAG: 'Bag & box', FILLER: 'Filler', ITEM: 'Item', DECORATION: 'Decoration' },
   // Case artwork is digital: printed full-bleed, never stocked or measured.
   CASE: { ILLUSTRATION: 'Illustration', PATTERN: 'Pattern', PHOTO: 'Photo', LOGO: 'Logo' },
+  // Sticker designs are printed on demand like case artwork; the app filters by these.
+  STICKER: { ILLUSTRATION: 'Illustration', QUOTE: 'Quote', LOGO: 'Logo', EMOJI: 'Emoji', PATTERN: 'Pattern' },
 }
 /** Type choices for a component of a category with this builder; free text is always allowed. */
 export const typesFor = (builderType) => componentTypes[builderType] || {}
@@ -80,6 +84,7 @@ export const categoryForm = (record) => {
   form.jewelryShape =
     record?.builderType === 'JEWELRY' ? (isNecklaceCategory(record) ? 'NECKLACE' : 'BRACELET') : ''
   if (form.jewelryShape) form.sizes = jewelryFormSizes(record?.sizes ?? [])
+  if (record?.builderType === 'STICKER') form.sizes = stickerFormSizes(record?.sizes ?? [])
   return form
 }
 
@@ -114,8 +119,13 @@ export const catalogPayload = (form, isSubCategory, measuredComponent = false) =
     payload.builderType = form.builderType || null
     // Any studio may share another category's subcategories (e.g. beads for bracelets and necklaces).
     payload.designCategoryId = form.builderType ? form.designCategoryId || null : null
-    // Jewelry (bracelets and necklaces) is sized by length ranges.
-    payload.sizes = form.builderType === 'JEWELRY' ? jewelrySizesPayload(form.sizes ?? []) : null
+    // Jewelry (bracelets and necklaces) is sized by length ranges; stickers by shape and size.
+    payload.sizes =
+      form.builderType === 'JEWELRY'
+        ? jewelrySizesPayload(form.sizes ?? [])
+        : form.builderType === 'STICKER'
+          ? stickerSizesPayload(form.sizes ?? [])
+          : null
     if (form.builderType === 'JEWELRY')
       payload.builderConfig = { silhouette: form.jewelryShape || 'BRACELET' }
     // Colour and size live on each apparel product; the category only keeps the shape.

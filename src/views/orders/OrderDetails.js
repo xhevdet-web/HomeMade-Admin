@@ -252,6 +252,8 @@ const OrderDetails = ({ id, initialDelete = false, onClose, onChanged, onDeleted
                 <div>
                   <span>Order total</span>
                   <strong>{formatPrice(order.totalPrice)}</strong>
+                  {/* Ready-made stickers are ordered in quantities; everything else is one piece. */}
+                  {order.quantity > 1 && <small>Quantity: {order.quantity} pieces</small>}
                   <small>Price at the time of ordering</small>
                 </div>
               </div>
