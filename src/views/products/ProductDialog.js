@@ -23,6 +23,7 @@ import { validateImageFile } from '../../_helpers/imageUpload'
 import ImagePicker from '../../components/ImagePicker'
 import { useAuthSelector } from '../../redux/selectors/authSelectors'
 import PrintAreaEditor from '../apparel/PrintAreaEditor'
+import MugPrintFields from './MugPrintFields'
 import ProductImage from './ProductImage'
 import DesignPreview from './DesignPreview'
 import ComponentTable from './ComponentTable'
@@ -33,6 +34,7 @@ import {
   emptyProductForm,
   formatPrice,
   isApparel,
+  isMug,
   isCompany,
   originLabels,
   productDate,
@@ -115,6 +117,7 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
   const apparel = isApparel(category ?? record?.category)
   // Phone case models: one product per model, with its own template and overlay.
   const phoneCase = isCase(category ?? record?.category)
+  const mug = isMug(category ?? record?.category)
   const silhouette = (category ?? record?.category)?.builderConfig?.silhouette
   const frontSrc = imagePreview || record?.imageUrl
   const backSrc = backPreview || record?.backImageUrl || frontSrc
@@ -170,7 +173,7 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
         }
         if (phoneCase && overlayImage && overlayImage.type !== 'image/png')
           throw new Error('The overlay must be a transparent PNG.')
-        const fields = companyPayload(form, apparel, phoneCase)
+        const fields = companyPayload(form, apparel, phoneCase, mug)
         // Case templates stay untouched so the overlay and areas line up with them.
         if (phoneCase && image) fields.removeBackground = false
         if (phoneCase && removeOverlay && !overlayImage && action.mode === 'edit')
@@ -636,6 +639,14 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
                         onCameraEnabled={setField('cameraEnabled')}
                       />
                     </section>
+                  )}
+                  {mug && (
+                    <MugPrintFields
+                      blank={form.mugBlank}
+                      print={form.mugPrint}
+                      onBlank={setField('mugBlank')}
+                      onChange={setField('mugPrint')}
+                    />
                   )}
                   {apparel && (
                     <section className="mt-4" aria-label="Print areas">

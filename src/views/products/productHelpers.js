@@ -7,6 +7,7 @@ import {
   sizesPayload,
 } from '../apparel/apparelHelpers'
 import { caseAreaPayload, defaultCameraArea, defaultCaseArea } from '../cases/caseHelpers'
+import { emptyMugPrint, mugPrintForm, mugPrintPayload } from './MugPrintFields'
 
 export const formatPrice = (cents) =>
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(cents / 100)
@@ -24,6 +25,7 @@ export const originLabels = { COMPANY: 'Company', CUSTOMER: 'Customer' }
 export const isCompany = (product) => product?.origin === 'COMPANY'
 // Apparel products are one colour each, with print areas for the studio.
 export const isApparel = (category) => category?.builderType === 'APPAREL'
+export const isMug = (category) => category?.builderType === 'MUG'
 
 /** The picture that represents a product: a design's preview, else its photo. */
 export const productImage = (product) =>
@@ -56,6 +58,9 @@ export const emptyProductForm = (categoryId = '', apparel = false) => ({
   caseArea: defaultCaseArea(),
   cameraEnabled: true,
   cameraArea: defaultCameraArea(),
+  // Mugs: the blank mug customers design on, with its print area in mm.
+  mugBlank: false,
+  mugPrint: emptyMugPrint,
   isActive: true,
 })
 
@@ -78,11 +83,13 @@ export const productForm = (product) => ({
   caseArea: { ...(product.printAreas?.front || defaultCaseArea()) },
   cameraEnabled: !product.printAreas || !!product.printAreas.camera,
   cameraArea: { ...(product.printAreas?.camera || defaultCameraArea()) },
+  mugBlank: Number.isInteger(product.printAreas?.front?.widthMm),
+  mugPrint: mugPrintForm(product.printAreas?.front),
   isActive: product.isActive ?? true,
 })
 
 /** Validated COMPANY product fields; throws a readable Error. */
-export const companyPayload = (form, apparel, phoneCase = false) => {
+export const companyPayload = (form, apparel, phoneCase = false, mug = false) => {
   if (!form.name.trim()) throw new Error('Name is required.')
   const fields = {
     categoryId: form.categoryId,
@@ -122,6 +129,8 @@ export const companyPayload = (form, apparel, phoneCase = false) => {
       ...(form.cameraEnabled ? { camera: caseAreaPayload(form.cameraArea) } : {}),
     }
   }
+  // Only the blank mug has a print area; ready-made mugs have none.
+  if (mug) fields.printAreas = form.mugBlank ? { front: mugPrintPayload(form.mugPrint) } : null
   return fields
 }
 

@@ -268,12 +268,15 @@ const OrderDetails = ({ id, initialDelete = false, onClose, onChanged, onDeleted
                 {base ? (
                   <div className="hm-apparel-previews">
                     <figure>
-                      <figcaption>Front</figcaption>
+                      {/* Mugs: the mug mockup, then the flat artwork to print. */}
+                      <figcaption>{product?.category?.builderType === 'MUG' ? 'Mug preview' : 'Front'}</figcaption>
                       <DesignPreview src={orderDesignImage(order)} name={`${product?.name || 'Design'} front`} large />
                     </figure>
                     {product?.backDesignPreviewUrl && (
                       <figure>
-                        <figcaption>Back</figcaption>
+                        <figcaption>
+                          {product?.category?.builderType === 'MUG' ? 'Print file (flat)' : 'Back'}
+                        </figcaption>
                         <DesignPreview src={product.backDesignPreviewUrl} name={`${product?.name || 'Design'} back`} large />
                       </figure>
                     )}

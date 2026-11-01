@@ -45,6 +45,7 @@ export const builderLabels = {
   GIFT: 'Gift',
   CASE: 'Phone cases',
   STICKER: 'Stickers',
+  MUG: 'Mugs',
 }
 
 // Component types per studio. The app uses them for its picker filters (Flowers, Greenery,
@@ -63,6 +64,8 @@ const componentTypes = {
   CASE: { ILLUSTRATION: 'Illustration', PATTERN: 'Pattern', PHOTO: 'Photo', LOGO: 'Logo' },
   // Sticker designs are printed on demand like case artwork; the app filters by these.
   STICKER: { ILLUSTRATION: 'Illustration', QUOTE: 'Quote', LOGO: 'Logo', EMOJI: 'Emoji', PATTERN: 'Pattern' },
+  // Mug artwork is printed on demand too.
+  MUG: { ILLUSTRATION: 'Illustration', QUOTE: 'Quote', LOGO: 'Logo', FRAME: 'Frame', PATTERN: 'Pattern' },
 }
 /** Type choices for a component of a category with this builder; free text is always allowed. */
 export const typesFor = (builderType) => componentTypes[builderType] || {}

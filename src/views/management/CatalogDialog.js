@@ -113,7 +113,7 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
     setForm((previous) => ({
       ...previous,
       categoryId: event.target.value,
-      ...(action.mode === 'create' && ['CASE', 'STICKER'].includes(parent?.builderType)
+      ...(action.mode === 'create' && ['CASE', 'STICKER', 'MUG'].includes(parent?.builderType)
         ? { trackStock: false }
         : {}),
     }))

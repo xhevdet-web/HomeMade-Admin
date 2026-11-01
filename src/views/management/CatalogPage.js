@@ -36,6 +36,8 @@ const configurationSummary = (record) => {
     return `${silhouettes[record.builderConfig?.silhouette] || 'No'} silhouette`
   // Phone models (template, print area, price, stock) are managed as its products.
   if (record.builderType === 'CASE') return 'Phone models on Products'
+  // The blank mug (price, stock, print area) is managed as one of its products.
+  if (record.builderType === 'MUG') return 'Blank mug on Products'
   if (record.builderType === 'STICKER') {
     const count = record.sizes?.length || 0
     return count ? `${count} ${count === 1 ? 'size' : 'sizes'} · priced per sticker` : 'Add sizes'
