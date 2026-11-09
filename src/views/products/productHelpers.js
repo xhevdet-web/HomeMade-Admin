@@ -6,7 +6,13 @@ import {
   sizeRows,
   sizesPayload,
 } from '../apparel/apparelHelpers'
-import { caseAreaPayload, defaultCameraArea, defaultCaseArea } from '../cases/caseHelpers'
+import {
+  brandLabel,
+  caseAreaPayload,
+  defaultCameraArea,
+  defaultCaseArea,
+  deviceBrands,
+} from '../cases/caseHelpers'
 import { emptyMugPrint, mugPrintForm, mugPrintPayload } from './MugPrintFields'
 
 export const formatPrice = (cents) =>
@@ -58,6 +64,9 @@ export const emptyProductForm = (categoryId = '', apparel = false) => ({
   caseArea: defaultCaseArea(),
   cameraEnabled: true,
   cameraArea: defaultCameraArea(),
+  // Ready-made phone cases: sold as they are, linked to the phone model they fit.
+  readyMadeCase: false,
+  baseProductId: '',
   // Mugs: the blank mug customers design on, with its print area in mm.
   mugBlank: false,
   mugPrint: emptyMugPrint,
@@ -83,13 +92,18 @@ export const productForm = (product) => ({
   caseArea: { ...(product.printAreas?.front || defaultCaseArea()) },
   cameraEnabled: !product.printAreas || !!product.printAreas.camera,
   cameraArea: { ...(product.printAreas?.camera || defaultCameraArea()) },
+  readyMadeCase: !!product.baseProductId,
+  baseProductId: product.baseProductId ?? '',
   mugBlank: Number.isInteger(product.printAreas?.front?.widthMm),
   mugPrint: mugPrintForm(product.printAreas?.front),
   isActive: product.isActive ?? true,
 })
 
-/** Validated COMPANY product fields; throws a readable Error. */
-export const companyPayload = (form, apparel, phoneCase = false, mug = false) => {
+/**
+ * Validated COMPANY product fields; throws a readable Error. `original` is the product
+ * being edited, if any.
+ */
+export const companyPayload = (form, apparel, phoneCase = false, mug = false, original = null) => {
   if (!form.name.trim()) throw new Error('Name is required.')
   const fields = {
     categoryId: form.categoryId,
@@ -117,21 +131,64 @@ export const companyPayload = (form, apparel, phoneCase = false, mug = false) =>
     const back = form.backEnabled ? printAreaPayload(form.backPrintArea, 'Back print area') : null
     fields.printAreas = front || back ? { ...(front ? { front } : {}), ...(back ? { back } : {}) } : null
   }
+  const readyMadeCase = phoneCase && form.readyMadeCase
   if (phoneCase) {
-    if (!form.deviceBrand) throw new Error('Choose the brand of this phone model.')
+    if (readyMadeCase && !form.baseProductId)
+      throw new Error('Choose the phone model this case fits.')
+    if (!readyMadeCase && !form.deviceBrand)
+      throw new Error('Choose the brand of this phone model.')
     const sortOrder = Number(form.sortOrder)
     if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 1000000)
       throw new Error('Sort order must be a nonnegative whole number.')
-    fields.deviceBrand = form.deviceBrand
     fields.sortOrder = sortOrder
-    fields.printAreas = {
-      front: caseAreaPayload(form.caseArea),
-      ...(form.cameraEnabled ? { camera: caseAreaPayload(form.cameraArea) } : {}),
+    if (readyMadeCase) {
+      // A ready-made case is sold as it is: no print area, linked to the model it fits.
+      fields.deviceBrand = form.deviceBrand || null
+      fields.baseProductId = form.baseProductId
+      fields.printAreas = null
+    } else {
+      fields.deviceBrand = form.deviceBrand
+      fields.printAreas = {
+        front: caseAreaPayload(form.caseArea),
+        ...(form.cameraEnabled ? { camera: caseAreaPayload(form.cameraArea) } : {}),
+      }
     }
   }
+  // Unlink a former ready-made case ("" is only valid on PATCH; creates never send it).
+  if (!readyMadeCase && original?.baseProductId) fields.baseProductId = ''
   // Only the blank mug has a print area; ready-made mugs have none.
   if (mug) fields.printAreas = form.mugBlank ? { front: mugPrintPayload(form.mugPrint) } : null
   return fields
+}
+
+/**
+ * Phone models a ready-made case can fit, as [brand label, models] groups: brands in the
+ * app's order (unknown ones after, alphabetically; no brand last), models by sort order
+ * then name. The product being edited is left out.
+ */
+export const phoneModelGroups = (models, editing = null) => {
+  const brandOrder = Object.keys(deviceBrands)
+  const rank = (brand) => {
+    if (!brand) return brandOrder.length + 1
+    const index = brandOrder.indexOf(brand)
+    return index < 0 ? brandOrder.length : index
+  }
+  const groups = new Map()
+  models
+    .filter((model) => model.id !== editing?.id)
+    .forEach((model) => {
+      const brand = model.deviceBrand || ''
+      if (!groups.has(brand)) groups.set(brand, [])
+      groups.get(brand).push(model)
+    })
+  return [...groups.entries()]
+    .sort(([a], [b]) => rank(a) - rank(b) || brandLabel(a).localeCompare(brandLabel(b)))
+    .map(([brand, list]) => [
+      brand ? brandLabel(brand) : 'No brand',
+      list.sort(
+        (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name),
+      ),
+    ])
 }
 
 /** Multipart body; sizes and printAreas travel as JSON, where "null" clears them. */

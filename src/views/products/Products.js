@@ -31,12 +31,14 @@ import {
 } from './productHelpers'
 import { packagingLabel } from '../giftPackaging/packagingHelpers'
 import { sizeLabel } from '../orders/orderHelpers'
-import { brandLabel } from '../cases/caseHelpers'
+import { brandLabel, isCase } from '../cases/caseHelpers'
 
 /** One line under the name: colour and sizes, or what a customer design was made on. */
 const productDetail = (product) =>
   isCompany(product)
     ? [
+        // Ready-made phone cases name the phone model they fit.
+        product.baseProduct ? `Fits ${product.baseProduct.name}` : null,
         product.deviceBrand ? brandLabel(product.deviceBrand) : null,
         product.color,
         product.sizes?.length ? `${product.sizes.length} sizes` : null,
@@ -284,6 +286,11 @@ const Products = () => {
                     </CTableDataCell>
                     <CTableDataCell>
                       <strong>{product.name}</strong>
+                      {isCase(category) && isCompany(product) && (
+                        <span className="hm-badge ms-2">
+                          {product.baseProductId ? 'Ready-made' : 'Phone model'}
+                        </span>
+                      )}
                       {productDetail(product) && (
                         <small className="d-block hm-muted">{productDetail(product)}</small>
                       )}

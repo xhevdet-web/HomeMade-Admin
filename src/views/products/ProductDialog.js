@@ -37,6 +37,7 @@ import {
   isMug,
   isCompany,
   originLabels,
+  phoneModelGroups,
   productDate,
   productForm,
   productFormData,
@@ -115,9 +116,62 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
   const company = action.mode === 'create' || isCompany(record)
   const category = categories.find((entry) => entry.id === form.categoryId)
   const apparel = isApparel(category ?? record?.category)
-  // Phone case models: one product per model, with its own template and overlay.
+  // Phone case products: a phone model (template, overlay, printable area) customers
+  // design on, or a ready-made case sold as it is, linked to the model it fits.
   const phoneCase = isCase(category ?? record?.category)
+  const readyMadeCase = phoneCase && form.readyMadeCase
+  const phoneModel = phoneCase && !form.readyMadeCase
   const mug = isMug(category ?? record?.category)
+  const editing = (action.mode === 'create' || action.mode === 'edit') && company
+
+  // The phone models of this category, for the "Fits phone model" select.
+  const [models, setModels] = useState({ categoryId: null, list: [], loading: false, error: null })
+  const [modelsAttempt, setModelsAttempt] = useState(0)
+  const modelsCategoryId = editing && readyMadeCase ? form.categoryId : null
+  useEffect(() => {
+    if (!modelsCategoryId) return
+    const controller = new AbortController()
+    setModels({ categoryId: modelsCategoryId, list: [], loading: true, error: null })
+    api
+      .get('/products', {
+        params: { categoryId: modelsCategoryId, origin: 'COMPANY' },
+        signal: controller.signal,
+      })
+      .then(({ data }) => {
+        if (!Array.isArray(data)) throw new Error('Invalid products response')
+        if (controller.signal.aborted) return
+        setModels({
+          categoryId: modelsCategoryId,
+          list: data.filter((product) => !product.baseProductId && product.printAreas?.front),
+          loading: false,
+          error: null,
+        })
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted)
+          setModels({
+            categoryId: modelsCategoryId,
+            list: [],
+            loading: false,
+            error: apiErrorMessage(error, 'Unable to load the phone models. Please try again.'),
+          })
+      })
+    return () => controller.abort()
+  }, [modelsCategoryId, modelsAttempt])
+  const modelGroups = phoneModelGroups(
+    models.categoryId === form.categoryId ? models.list : [],
+    record,
+  )
+  const chooseModel = (event) => {
+    const id = event.target.value
+    const model = modelGroups.flatMap(([, list]) => list).find((entry) => entry.id === id)
+    setForm((previous) => ({
+      ...previous,
+      baseProductId: id,
+      // The brand follows the model it fits, unless one was chosen already.
+      deviceBrand: previous.deviceBrand || model?.deviceBrand || '',
+    }))
+  }
   const silhouette = (category ?? record?.category)?.builderConfig?.silhouette
   const frontSrc = imagePreview || record?.imageUrl
   const backSrc = backPreview || record?.backImageUrl || frontSrc
@@ -135,6 +189,9 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
       return {
         ...previous,
         categoryId: event.target.value,
+        // A ready-made case fits a phone model of its own category only.
+        baseProductId:
+          event.target.value === record?.categoryId ? (record?.baseProductId ?? '') : '',
         ...(untouched && action.mode === 'create'
           ? { sized: defaults.sized, sizes: defaults.sizes, frontEnabled: defaults.frontEnabled }
           : {}),
@@ -167,23 +224,25 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
         if (!categories.some((entry) => entry.id === form.categoryId))
           throw new Error('Select a category.')
         if (action.mode === 'create' && !image) throw new Error('Choose an image for the product.')
-        for (const file of [image, backImage, overlayImage]) {
+        for (const file of [image, apparel && backImage, phoneModel && overlayImage]) {
           const invalid = validateImageFile(file)
           if (invalid) throw new Error(invalid)
         }
-        if (phoneCase && overlayImage && overlayImage.type !== 'image/png')
+        if (phoneModel && overlayImage && overlayImage.type !== 'image/png')
           throw new Error('The overlay must be a transparent PNG.')
-        const fields = companyPayload(form, apparel, phoneCase, mug)
-        // Case templates stay untouched so the overlay and areas line up with them.
-        if (phoneCase && image) fields.removeBackground = false
-        if (phoneCase && removeOverlay && !overlayImage && action.mode === 'edit')
+        const fields = companyPayload(form, apparel, phoneCase, mug, record)
+        // Case templates stay untouched so the overlay and areas line up with them. A
+        // ready-made case photo gets the same background handling as other products.
+        if (phoneModel && image) fields.removeBackground = false
+        if (phoneModel && removeOverlay && !overlayImage && action.mode === 'edit')
           fields.removeOverlay = true
         const files = {
           file: image,
           ...(apparel ? { backImage } : {}),
-          ...(phoneCase ? { overlayImage } : {}),
+          ...(phoneModel ? { overlayImage } : {}),
         }
-        const timeout = image || backImage || overlayImage ? 120000 : 15000
+        const timeout =
+          image || (apparel && backImage) || (phoneModel && overlayImage) ? 120000 : 15000
         request =
           action.mode === 'create'
             ? () =>
@@ -230,6 +289,10 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
         ...(company
           ? [
               ['Price', formatPrice(record.price)],
+              ...(phoneCase
+                ? [['Kind', record.baseProductId ? 'Ready-made case' : 'Phone model']]
+                : []),
+              ...(record.baseProduct ? [['Fits', record.baseProduct.name]] : []),
               ...(record.deviceBrand ? [['Brand', brandLabel(record.deviceBrand)]] : []),
               ...(record.color ? [['Colour', record.color]] : []),
               ...(record.sizes?.length ? [] : [['Available stock', record.stock]]),
@@ -269,7 +332,13 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
           value={form.name}
           onChange={change}
           placeholder={
-            apparel ? 'e.g. Black Essential Hoodie' : phoneCase ? 'e.g. iPhone 14' : undefined
+            apparel
+              ? 'e.g. Black Essential Hoodie'
+              : readyMadeCase
+                ? 'e.g. iPhone 15 – Marble'
+                : phoneCase
+                  ? 'e.g. iPhone 14'
+                  : undefined
           }
         />
       </CCol>
@@ -459,6 +528,36 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
                       </CFormSelect>
                     </CCol>
                     {textFields}
+                    {phoneCase && (
+                      <CCol xs={12}>
+                        <fieldset aria-describedby="product-case-kind-help">
+                          <legend className="form-label fs-6 mb-1">Kind of phone case product</legend>
+                          <CFormCheck
+                            inline
+                            type="radio"
+                            name="caseKind"
+                            id="product-case-kind-model"
+                            label="Phone model (customers design on it)"
+                            checked={!form.readyMadeCase}
+                            onChange={() => setField('readyMadeCase')(false)}
+                          />
+                          <CFormCheck
+                            inline
+                            type="radio"
+                            name="caseKind"
+                            id="product-case-kind-ready"
+                            label="Ready-made case (sold as it is)"
+                            checked={form.readyMadeCase}
+                            onChange={() => setField('readyMadeCase')(true)}
+                          />
+                          <p id="product-case-kind-help" className="hm-muted small mt-1 mb-0">
+                            {form.readyMadeCase
+                              ? 'A finished printed case with its own photo, price and stock, linked to the phone model it fits.'
+                              : 'The blank of one phone model in the Case Studio: its template, printable area and camera opening.'}
+                          </p>
+                        </fieldset>
+                      </CCol>
+                    )}
                     <CCol md={6}>
                       <CFormLabel htmlFor="product-price">Price (€)</CFormLabel>
                       <CFormInput
@@ -474,12 +573,74 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
                     </CCol>
                     {phoneCase && (
                       <>
+                        {readyMadeCase && (
+                          <CCol md={6}>
+                            <CFormLabel htmlFor="product-baseProductId">Fits phone model</CFormLabel>
+                            <CFormSelect
+                              id="product-baseProductId"
+                              name="baseProductId"
+                              required
+                              disabled={models.loading}
+                              value={form.baseProductId}
+                              onChange={chooseModel}
+                              aria-describedby="product-baseProductId-help"
+                            >
+                              <option value="">
+                                {models.loading ? 'Loading phone models...' : 'Select a phone model'}
+                              </option>
+                              {/* The current link, should it no longer be listed. */}
+                              {form.baseProductId &&
+                                form.baseProductId === record?.baseProduct?.id &&
+                                !modelGroups.some(([, list]) =>
+                                  list.some((model) => model.id === form.baseProductId),
+                                ) && (
+                                  <option value={form.baseProductId}>{record.baseProduct.name}</option>
+                                )}
+                              {modelGroups.map(([brand, list]) => (
+                                <optgroup label={brand} key={brand}>
+                                  {list.map((model) => (
+                                    <option
+                                      value={model.id}
+                                      key={model.id}
+                                      // Inactive models keep their cases but take no new ones.
+                                      disabled={!model.isActive && model.id !== record?.baseProductId}
+                                    >
+                                      {model.name}
+                                      {model.isActive ? '' : ' (inactive)'}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              ))}
+                            </CFormSelect>
+                            {models.error ? (
+                              <small id="product-baseProductId-help" className="text-danger">
+                                {models.error}{' '}
+                                <CButton
+                                  color="link"
+                                  size="sm"
+                                  className="p-0 align-baseline"
+                                  onClick={() => setModelsAttempt((value) => value + 1)}
+                                >
+                                  Try again
+                                </CButton>
+                              </small>
+                            ) : (
+                              <small id="product-baseProductId-help" className="hm-muted">
+                                {!models.loading && !modelGroups.length
+                                  ? 'Add a phone model to this category first.'
+                                  : 'The phone model this case is made for.'}
+                              </small>
+                            )}
+                          </CCol>
+                        )}
                         <CCol md={3}>
-                          <CFormLabel htmlFor="product-deviceBrand">Brand</CFormLabel>
+                          <CFormLabel htmlFor="product-deviceBrand">
+                            {readyMadeCase ? 'Brand (optional)' : 'Brand'}
+                          </CFormLabel>
                           <CFormSelect
                             id="product-deviceBrand"
                             name="deviceBrand"
-                            required
+                            required={phoneModel}
                             value={form.deviceBrand}
                             onChange={change}
                           >
@@ -565,7 +726,7 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
                         </CCol>
                       )}
                     </CCol>
-                    <CCol md={apparel || phoneCase ? 6 : 12}>
+                    <CCol md={apparel || phoneModel ? 6 : 12}>
                       <ImagePicker
                         id="product-image"
                         file={image}
@@ -573,22 +734,24 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
                         imageUrl={record?.imageUrl}
                         name={form.name}
                         required={action.mode === 'create'}
-                        processBackground={!phoneCase}
+                        processBackground={!phoneModel}
                         label={
                           apparel
                             ? 'Product image (front)'
-                            : phoneCase
+                            : phoneModel
                               ? 'Case template (required)'
-                              : undefined
+                              : readyMadeCase
+                                ? `Photo of the finished case${action.mode === 'create' ? ' (required)' : ''}`
+                                : undefined
                         }
                         hint={
-                          phoneCase
+                          phoneModel
                             ? 'The empty back of this exact model, ideally a transparent PNG. Stored untouched.'
                             : undefined
                         }
                       />
                     </CCol>
-                    {phoneCase && (
+                    {phoneModel && (
                       <CCol md={6}>
                         <ImagePicker
                           id="product-overlay-image"
@@ -626,7 +789,7 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
                     )}
                     {activeField}
                   </CRow>
-                  {phoneCase && (
+                  {phoneModel && (
                     <section className="mt-4" aria-label="Case template">
                       <CaseTemplateEditor
                         src={imagePreview || record?.imageUrl}
@@ -702,7 +865,7 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
                   <CSpinner size="sm" aria-hidden="true" className="me-2" />
                   {action.mode === 'delete'
                     ? 'Deleting...'
-                    : image || backImage || overlayImage
+                    : image || (apparel && backImage) || (phoneModel && overlayImage)
                       ? 'Saving and processing image...'
                       : 'Saving...'}
                 </>
