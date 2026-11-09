@@ -41,9 +41,14 @@ import { builderLabels } from './catalogFields'
 import { formatPrice } from '../products/productHelpers'
 import { silhouettes } from '../apparel/apparelHelpers'
 
-const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
+/**
+ * `categoryId` (subcategories): the category page it was opened from. The subcategory
+ * then always belongs to it, and the form shows the category instead of asking for it.
+ */
+const CatalogDialog = ({ kind, action, categoryId: fixedCategoryId, onClose, onSaved }) => {
   const { singular, endpoint } = catalogConfig[kind]
   const isSubCategory = kind === 'sub-categories'
+  const fixedParent = isSubCategory && !!fixedCategoryId
   const editing = action.mode === 'create' || action.mode === 'edit'
   const [form, setForm] = useState(emptyCatalogForm)
   const [record, setRecord] = useState(null)
@@ -84,9 +89,13 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
         setRecord(data)
         setCategories(optionsResponse?.data || [])
         const nextForm = categoryForm(data)
+        if (fixedParent && !data) nextForm.categoryId = fixedCategoryId
         const builder = (optionsResponse?.data || []).find(
           (category) => category.id === nextForm.categoryId,
         )?.builderType
+        // New phone case, sticker and mug artwork is printed on demand: no stock tracking.
+        if (fixedParent && !data && ['CASE', 'STICKER', 'MUG'].includes(builder))
+          nextForm.trackStock = false
         setCustomType(!!nextForm.type && !typesFor(builder)[nextForm.type])
         setForm(nextForm)
       })
@@ -98,7 +107,7 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
         if (!controller.signal.aborted) setLoading(false)
       })
     return () => controller.abort()
-  }, [action.id, action.mode, endpoint, isSubCategory, editing, attempt])
+  }, [action.id, action.mode, endpoint, isSubCategory, editing, attempt, fixedParent, fixedCategoryId])
 
   const change = (event) => {
     const { name, value, type, checked } = event.target
@@ -223,7 +232,13 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
 
   // A saved type outside the category's choices is shown as free text.
   const showCustomType = customType || (!!form.type && !componentTypes[form.type])
-  const title = `${action.mode === 'view' ? '' : action.mode === 'create' ? 'Create ' : action.mode === 'edit' ? 'Edit ' : 'Delete '}${singular}${action.mode === 'view' ? ' details' : ''}`
+  const parentName = fixedParent
+    ? categories.find((category) => category.id === fixedCategoryId)?.name
+    : null
+  const title =
+    action.mode === 'create' && parentName
+      ? `Add ${parentName} subcategory`
+      : `${action.mode === 'view' ? '' : action.mode === 'create' ? 'Create ' : action.mode === 'edit' ? 'Edit ' : 'Delete '}${singular}${action.mode === 'view' ? ' details' : ''}`
   const fields = [
     ['Name', record?.name],
     ...(isSubCategory
@@ -398,7 +413,19 @@ const CatalogDialog = ({ kind, action, onClose, onSaved }) => {
               ) : (
                 <fieldset disabled={saving}>
                   <CRow className="g-3">
-                    {isSubCategory && (
+                    {fixedParent && (
+                      <CCol xs={12}>
+                        <p className="hm-form-context mb-0">
+                          Category{' '}
+                          <strong>
+                            {categories.find((category) => category.id === form.categoryId)?.name ||
+                              record?.category?.name ||
+                              '—'}
+                          </strong>
+                        </p>
+                      </CCol>
+                    )}
+                    {isSubCategory && !fixedParent && (
                       <CCol xs={12}>
                         <CFormLabel htmlFor="catalog-categoryId">Category</CFormLabel>
                         <CFormSelect
@@ -731,6 +758,7 @@ CatalogDialog.propTypes = {
     mode: PropTypes.string.isRequired,
     id: PropTypes.string,
   }).isRequired,
+  categoryId: PropTypes.string,
   onClose: PropTypes.func.isRequired,
   onSaved: PropTypes.func.isRequired,
 }

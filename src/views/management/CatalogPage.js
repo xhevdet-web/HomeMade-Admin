@@ -21,6 +21,7 @@ import CatalogDialog from './CatalogDialog'
 import ProductImage from '../products/ProductImage'
 import { builderLabels, catalogConfig, isJewelryCategory } from './catalogFields'
 import { silhouettes } from '../apparel/apparelHelpers'
+import { useCatalogCategories } from '../catalog/CatalogCategories'
 
 const configurationSummary = (record) => {
   if (record.builderType === 'JEWELRY') {
@@ -48,6 +49,8 @@ const configurationSummary = (record) => {
 const CatalogPage = ({ kind }) => {
   const { title, singular, endpoint, description } = catalogConfig[kind]
   const isSubCategory = kind === 'sub-categories'
+  // The sidebar's Products and SubCategories menus follow category changes.
+  const { reload: reloadCatalogCategories } = useCatalogCategories()
   const [records, setRecords] = useState([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
@@ -358,6 +361,7 @@ const CatalogPage = ({ kind }) => {
               )
             setAction(null)
             setNotice(message)
+            if (!isSubCategory) reloadCatalogCategories()
             setRevision((value) => value + 1)
           }}
         />

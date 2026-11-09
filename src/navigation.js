@@ -14,8 +14,9 @@ const navigation = [
   heading('Management'),
   item('Users', 'Users', '/users', 'cilPeople'),
   item('Categories', 'Categories', '/categories', 'cilFolderOpen'),
-  item('SubCategories', 'SubCategories', '/sub-categories', 'cilList'),
-  item('Products', 'Products', '/products', 'cilStar'),
+  // The sidebar expands these two into one entry per active category (catalogNavigation.js).
+  { ...item('Products', 'Products', '/products', 'cilStar'), catalogGroup: 'products' },
+  { ...item('SubCategories', 'SubCategories', '/sub-categories', 'cilList'), catalogGroup: 'sub-categories' },
   item('Components', 'Components', '/components', 'cilPuzzle'),
   item('Designs', 'Designs', '/designs', 'cilPencil'),
   heading('Gift'),

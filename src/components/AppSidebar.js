@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { NavLink } from 'react-router-dom'
 import {
@@ -15,11 +16,18 @@ import { setSidebarShow } from '../redux/actions/uiActions'
 import { useSidebarSelector } from '../redux/selectors/sidebarSelector'
 import { useAuthSelector } from '../redux/selectors/authSelectors'
 import useLogout from '../_helpers/HandleLogOut'
+import { useCatalogCategories } from '../views/catalog/CatalogCategories'
+import { catalogNavigation } from '../views/catalog/catalogNavigation'
 
 const AppSidebar = () => {
   const dispatch = useDispatch()
   const visible = useSelector((state) => state.ui.sidebarShow)
   const { filteredSidebarData } = useSidebarSelector()
+  const { activeCategories } = useCatalogCategories()
+  const items = useMemo(
+    () => catalogNavigation(filteredSidebarData, activeCategories),
+    [filteredSidebarData, activeCategories],
+  )
   const { userData } = useAuthSelector()
   const { handleLogout } = useLogout()
   const initials = `${userData?.firstName?.[0] || ''}${userData?.lastName?.[0] || ''}` || 'A'
@@ -44,7 +52,7 @@ const AppSidebar = () => {
           onClick={() => dispatch(setSidebarShow(false))}
         />
       </CSidebarHeader>
-      <AppSidebarNav items={filteredSidebarData} />
+      <AppSidebarNav items={items} />
       <CSidebarFooter className="hm-sidebar-footer">
         <div className="hm-admin">
           <span className="hm-avatar">{initials}</span>

@@ -180,25 +180,6 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
     const { name, value, type, checked } = event.target
     setForm((previous) => ({ ...previous, [name]: type === 'checkbox' ? checked : value }))
   }
-  const changeCategory = (event) => {
-    const next = categories.find((entry) => entry.id === event.target.value)
-    setForm((previous) => {
-      // Apparel is sold in sizes by default; untouched defaults follow the category.
-      const untouched = !previous.sizes.some((row) => Number(row.stock) > 0)
-      const defaults = emptyProductForm(event.target.value, isApparel(next))
-      return {
-        ...previous,
-        categoryId: event.target.value,
-        // A ready-made case fits a phone model of its own category only.
-        baseProductId:
-          event.target.value === record?.categoryId ? (record?.baseProductId ?? '') : '',
-        ...(untouched && action.mode === 'create'
-          ? { sized: defaults.sized, sizes: defaults.sizes, frontEnabled: defaults.frontEnabled }
-          : {}),
-      }
-    })
-  }
-
   const submit = async (event) => {
     event.preventDefault()
     if (submitting.current) return
@@ -222,7 +203,7 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
         request = () => api.patch(`/products/${encodeURIComponent(action.id)}`, productFormData(body))
       } else {
         if (!categories.some((entry) => entry.id === form.categoryId))
-          throw new Error('Select a category.')
+          throw new Error('This category is no longer available.')
         if (action.mode === 'create' && !image) throw new Error('Choose an image for the product.')
         for (const file of [image, apparel && backImage, phoneModel && overlayImage]) {
           const invalid = validateImageFile(file)
@@ -277,7 +258,7 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
   }
 
   const title = {
-    create: 'Add Product',
+    create: category ? `Add ${category.name} product` : 'Add Product',
     edit: company ? 'Edit Product' : 'Edit customer design',
     view: 'Product details',
     delete: 'Delete Product',
@@ -322,7 +303,7 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
     : []
   const textFields = (
     <>
-      <CCol md={6}>
+      <CCol xs={12}>
         <CFormLabel htmlFor="product-name">Name</CFormLabel>
         <CFormInput
           id="product-name"
@@ -510,22 +491,11 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
               ) : (
                 <fieldset disabled={saving || !isAdmin}>
                   <CRow className="g-3">
-                    <CCol md={6}>
-                      <CFormLabel htmlFor="product-categoryId">Category</CFormLabel>
-                      <CFormSelect
-                        id="product-categoryId"
-                        name="categoryId"
-                        required
-                        value={form.categoryId}
-                        onChange={changeCategory}
-                      >
-                        <option value="">Select a category</option>
-                        {categories.map((entry) => (
-                          <option value={entry.id} key={entry.id}>
-                            {entry.name}
-                          </option>
-                        ))}
-                      </CFormSelect>
+                    {/* The category comes from the page it was opened on and never changes here. */}
+                    <CCol xs={12}>
+                      <p className="hm-form-context mb-0">
+                        Category <strong>{category?.name || record?.category?.name || '—'}</strong>
+                      </p>
                     </CCol>
                     {textFields}
                     {phoneCase && (

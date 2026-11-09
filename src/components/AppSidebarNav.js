@@ -124,9 +124,9 @@ export const AppSidebarNav = ({ items }) => {
   }
 
   const navItem = (item, index, indent = false) => {
-    // console.log('itemitemitem', item)
-
-    const { id, component, title, badge, icon_name, name, is_nav, ...rest } = item
+    // eslint-disable-next-line no-unused-vars
+    const { id, component, title, badge, icon_name, name, is_nav, catalogGroup, children, ...rest } =
+      item
 
     if (component) {
       const Component = componentMapping[component]
@@ -156,7 +156,6 @@ export const AppSidebarNav = ({ items }) => {
                 onClick={(e) => handleClick(e, id)}
                 {...(rest.to && { as: NavLink })}
                 {...rest}
-                className={currentView === id ? 'active' : ''}
               >
                 {navLink(title, icon_name, badge, indent)}
               </CNavLink>
@@ -170,12 +169,13 @@ export const AppSidebarNav = ({ items }) => {
     return null
   }
 
+  // Groups open by themselves when one of their links is active (CoreUI accordion).
   const navGroup = (item, index) => {
-    const { id, component, title, icon_name, ...rest } = item
+    const { id, component, title, icon_name } = item
     const Component = componentMapping[component]
 
     return (
-      <Component key={id || index} toggler={navLink(title, icon_name)} {...rest}>
+      <Component key={id || index} toggler={navLink(title, icon_name)}>
         {item.children &&
           item.children.map((subItem, subIndex) =>
             subItem.component === 'CNavItem'

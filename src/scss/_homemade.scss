@@ -1743,3 +1743,148 @@ body {
     display: none !important;
   }
 }
+
+/* ---- Catalog: Products and SubCategories, one category at a time ---- */
+.hm-app .hm-sidebar {
+  // CoreUI's group defaults are made for a light sidebar (dark text when a group is open).
+  --cui-sidebar-nav-group-bg: rgba(0, 0, 0, 0.12);
+  --cui-sidebar-nav-group-toggle-show-color: #fff;
+  --cui-sidebar-nav-group-indicator-color: #97b0bf;
+  --cui-sidebar-nav-group-indicator-hover-color: #fff;
+  // An open group would otherwise colour every group label inside it as open too.
+  .sidebar-nav .nav-group .nav-group-toggle {
+    color: #c3d0d8;
+  }
+  .sidebar-nav .nav-group.show > .nav-group-toggle,
+  .sidebar-nav .nav-group .nav-group-toggle:hover {
+    color: #fff;
+  }
+  .sidebar-nav .nav-group-items .nav-group.show {
+    background: transparent;
+  }
+  .nav-group-items .nav-link {
+    padding: 9px 12px 9px 28px;
+    font-size: 0.84rem;
+  }
+  .nav-group-items .nav-group-items .nav-link {
+    padding-left: 44px;
+  }
+  .nav-group-items .nav-group-toggle {
+    font-weight: 500;
+  }
+}
+.hm-trail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--hm-steel);
+  li + li::before {
+    content: '/';
+    margin-right: 6px;
+    opacity: 0.6;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+  [aria-current='page'] {
+    color: var(--hm-text);
+  }
+}
+.hm-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.hm-form-context {
+  font-size: 0.8rem;
+  color: var(--hm-muted);
+  strong {
+    color: var(--hm-text);
+    margin-left: 6px;
+  }
+}
+.hm-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--hm-line);
+  flex-shrink: 0;
+}
+.hm-category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.hm-category-card {
+  background: var(--hm-surface);
+  border: 1px solid var(--hm-line);
+  border-radius: 12px;
+  box-shadow: 0 3px 14px rgba(31, 55, 74, 0.025);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.hm-category-card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  h2 {
+    font-family: Georgia, serif;
+    font-size: 1.1rem;
+    font-weight: 400;
+    margin: 0 0 4px;
+  }
+}
+.hm-category-card-links {
+  border-top: 1px solid var(--hm-line);
+  margin-top: auto;
+}
+.hm-category-card-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 20px;
+  color: var(--hm-text);
+  text-decoration: none;
+  font-size: 0.85rem;
+  small {
+    display: block;
+    color: var(--hm-muted);
+    font-size: 0.72rem;
+    margin-top: 2px;
+  }
+  > span:last-child {
+    color: var(--hm-steel);
+    white-space: nowrap;
+    font-size: 0.8rem;
+  }
+  & + & {
+    border-top: 1px solid var(--hm-line);
+  }
+  &:hover {
+    background: rgba(53, 87, 110, 0.05);
+  }
+}
+@media (max-width: 767px) {
+  .hm-page-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+}
