@@ -24,6 +24,11 @@ import { Link } from 'react-router-dom'
 import api, { apiErrorMessage } from '../../_helpers/api'
 import ProductImage from '../products/ProductImage'
 import ImagePicker from '../../components/ImagePicker'
+import BackgroundRemovalOption, {
+  BACKGROUND_REMOVAL_TIMEOUT,
+  removesBackground,
+  useBackgroundRemovalStatus,
+} from '../../components/BackgroundRemovalOption'
 import { imageFormData } from '../../_helpers/imageUpload'
 import {
   catalogConfig,
@@ -57,7 +62,10 @@ const CatalogDialog = ({ kind, action, categoryId: fixedCategoryId, onClose, onS
   const [loadError, setLoadError] = useState(null)
   const [error, setError] = useState(null)
   const [selectedFile, setSelectedFile] = useState(null)
-  const [removeBackground, setRemoveBackground] = useState(true)
+  // Opt-in: background removal runs only when the admin ticks it for a new upload.
+  const [removeBackground, setRemoveBackground] = useState(false)
+  const backgroundRemoval = useBackgroundRemovalStatus(editing && !!selectedFile)
+  const removing = removesBackground(removeBackground, backgroundRemoval)
   const [customType, setCustomType] = useState(false)
   const submitting = useRef(false)
   const [saving, setSaving] = useState(false)
@@ -176,10 +184,12 @@ const CatalogDialog = ({ kind, action, categoryId: fixedCategoryId, onClose, onS
           setError(validationError.message)
           return
         }
-        // removeBackground only matters for a new upload; false keeps fine logos untouched.
-        if (isSubCategory && selectedFile) fields.removeBackground = removeBackground
+        // Opt-in: sent only as true for a new upload. Omitted, the API keeps the image untouched.
+        if (selectedFile && removing) fields.removeBackground = true
         const payload = imageFormData(fields, selectedFile)
-        const options = { timeout: selectedFile ? 120000 : 15000 }
+        const options = {
+          timeout: removing ? BACKGROUND_REMOVAL_TIMEOUT : selectedFile ? 120000 : 15000,
+        }
         if (action.mode === 'create') saved = await api.post(endpoint, payload, options)
         else
           saved = await api.patch(`${endpoint}/${encodeURIComponent(action.id)}`, payload, options)
@@ -575,15 +585,14 @@ const CatalogDialog = ({ kind, action, categoryId: fixedCategoryId, onClose, onS
                         onChange={setSelectedFile}
                         imageUrl={record?.imageUrl}
                         name={form.name}
-                        processBackground={!isSubCategory || removeBackground}
+                        processBackground={removing}
                       />
-                      {isSubCategory && selectedFile && (
-                        <CFormCheck
-                          className="mt-2"
+                      {selectedFile && (
+                        <BackgroundRemovalOption
                           id="catalog-removeBackground"
-                          label="Remove background (turn off for fine logos and lettering)"
                           checked={removeBackground}
-                          onChange={(event) => setRemoveBackground(event.target.checked)}
+                          onChange={setRemoveBackground}
+                          status={backgroundRemoval}
                         />
                       )}
                       {isSubCategory && record?.originalImageUrl && (

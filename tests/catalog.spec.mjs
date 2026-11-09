@@ -400,17 +400,63 @@ test('designs support typed or free-text types, unlimited stock and background o
     'https://example.com/star-original.png',
   )
   await dialog(page).getByLabel('Image (optional)').setInputFiles(pngFile)
+  // Opt-in: every new upload starts with background removal off.
+  await expect(dialog(page).getByLabel('Remove background')).not.toBeChecked()
+  await expect(dialog(page)).not.toContainText('Background will be removed automatically.')
+  await dialog(page).getByLabel('Remove background').check()
   await expect(dialog(page)).toContainText('Background will be removed automatically.')
-  await dialog(page).getByLabel(/Remove background/).uncheck()
+  await dialog(page).getByLabel('Remove background').uncheck()
   await expect(dialog(page)).not.toContainText('Background will be removed automatically.')
   await dialog(page).getByLabel('Type', { exact: true }).selectOption('LETTERING')
   await dialog(page).getByRole('button', { name: 'Save SubCategory', exact: true }).click()
   await expect(dialog(page)).toHaveCount(0)
+  const patch = state.requests.find((r) => r.method === 'PATCH').body
+  expect(patch).toMatchObject({ type: 'LETTERING', trackStock: false, stock: 12 })
+  // Unticked: the field is omitted and the API stores the upload untouched.
+  expect(patch).not.toHaveProperty('removeBackground')
+})
+
+test('background removal is opt-in and unavailable when the server turns it off', async ({
+  page,
+}) => {
+  const state = await setup(page)
+  await page.route('http://localhost:3000/api/v1/images/background-removal', (route) =>
+    fulfill(route, { enabled: false, available: false }),
+  )
+  await page.goto('/#/categories')
+  await page.getByRole('button', { name: 'Edit Necklaces', exact: true }).click()
+  await dialog(page).getByLabel('Image (optional)').setInputFiles(pngFile)
+  const option = dialog(page).getByLabel('Remove background')
+  await expect(option).toBeDisabled()
+  await expect(option).not.toBeChecked()
+  await expect(dialog(page)).toContainText('Background removal is turned off on the server')
+  await expect(dialog(page)).not.toContainText('Background will be removed automatically.')
+  await dialog(page).getByRole('button', { name: 'Save Category', exact: true }).click()
+  await expect(dialog(page)).toHaveCount(0)
+  expect(state.requests.find((r) => r.method === 'PATCH').body).not.toHaveProperty(
+    'removeBackground',
+  )
+})
+
+test('ticking Remove background sends removeBackground=true with a longer upload timeout', async ({
+  page,
+}) => {
+  const state = await setup(page)
+  await page.goto('/#/categories')
+  await page.getByRole('button', { name: 'Edit Necklaces', exact: true }).click()
+  await expect(dialog(page).getByLabel('Remove background')).toHaveCount(0)
+  await dialog(page).getByLabel('Image (optional)').setInputFiles(pngFile)
+  const option = dialog(page).getByLabel('Remove background')
+  await expect(option).toBeEnabled()
+  await expect(option).not.toBeChecked()
+  await expect(dialog(page).locator('.hm-product-image-transparent')).toHaveCount(0)
+  await option.check()
+  await expect(dialog(page)).toContainText('Background will be removed automatically.')
+  await expect(dialog(page).locator('.hm-product-image-transparent')).toHaveCount(1)
+  await dialog(page).getByRole('button', { name: 'Save Category', exact: true }).click()
+  await expect(dialog(page)).toHaveCount(0)
   expect(state.requests.find((r) => r.method === 'PATCH').body).toMatchObject({
-    type: 'LETTERING',
-    trackStock: false,
-    removeBackground: false,
-    stock: 12,
+    removeBackground: true,
   })
 })
 
@@ -424,6 +470,7 @@ test('catalog image processing uses returned images and preserves drafts on uplo
   await page.goto('/#/sub-categories')
   await page.getByRole('button', { name: 'Edit Pearl pendant', exact: true }).click()
   await dialog(page).getByLabel('Image (optional)').setInputFiles(pngFile)
+  await dialog(page).getByLabel('Remove background').check()
   await expect(dialog(page)).toContainText('Background will be removed automatically.')
   const preview = dialog(page).getByRole('img', { name: 'Pearl pendant preview', exact: true })
   await expect(preview).toHaveAttribute('src', /^blob:/)
@@ -449,6 +496,7 @@ test('catalog image processing uses returned images and preserves drafts on uplo
   await page.goto('/#/categories')
   await page.getByRole('button', { name: 'Edit Necklaces', exact: true }).click()
   await dialog(page).getByLabel('Image (optional)').setInputFiles(pngFile)
+  await dialog(page).getByLabel('Remove background').check()
   await expect(dialog(page)).toContainText('Background will be removed automatically.')
   await expect(dialog(page).locator('.hm-product-image-transparent')).toHaveCount(1)
 })
@@ -473,6 +521,7 @@ test('SubCategory dropdown displays category names, submits IDs, and supports fu
   await dialog(page).getByLabel('Name', { exact: true }).fill('Silver charm')
   await dialog(page).getByLabel('Description', { exact: true }).fill('Small charm')
   await dialog(page).getByLabel('Image (optional)').setInputFiles(pngFile)
+  await dialog(page).getByLabel('Remove background').check()
   await dialog(page).getByLabel('Color', { exact: true }).fill('Silver')
   await dialog(page).getByLabel('Type', { exact: true }).selectOption('__custom')
   await dialog(page).getByLabel('Custom type').fill('Charm')

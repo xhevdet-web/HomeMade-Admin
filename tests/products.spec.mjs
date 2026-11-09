@@ -403,6 +403,9 @@ test('product image processing preserves drafts on backend errors and shows proc
   await page.getByRole('button', { name: 'Edit Gold Necklace', exact: true }).click()
   await dialog(page).getByLabel('Name', { exact: true }).fill('Processed necklace')
   await dialog(page).getByLabel('Image (optional)').setInputFiles(pngFile)
+  await expect(dialog(page).getByLabel('Remove background')).not.toBeChecked()
+  await expect(dialog(page)).not.toContainText('Background will be removed automatically.')
+  await dialog(page).getByLabel('Remove background').check()
   await expect(dialog(page)).toContainText('Background will be removed automatically.')
   const preview = dialog(page).getByRole('img', { name: 'Processed necklace preview', exact: true })
   await expect(preview).toHaveAttribute('src', /^blob:/)
@@ -418,6 +421,7 @@ test('product image processing preserves drafts on backend errors and shows proc
   await dialog(page).getByRole('button', { name: 'Save Product', exact: true }).click()
   await expect(dialog(page)).toHaveCount(0)
   expect(state.requests.filter((r) => r.method === 'PATCH')).toHaveLength(1)
+  expect(state.requests.find((r) => r.method === 'PATCH').body.removeBackground).toBe(true)
   await expect(
     page.getByRole('row').filter({ hasText: 'Processed necklace' }).locator('.hm-product-image img'),
   ).toHaveAttribute('src', 'https://images.example.test/processed-product.png')

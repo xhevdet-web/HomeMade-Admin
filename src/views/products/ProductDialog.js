@@ -21,6 +21,11 @@ import {
 import api, { apiErrorMessage } from '../../_helpers/api'
 import { validateImageFile } from '../../_helpers/imageUpload'
 import ImagePicker from '../../components/ImagePicker'
+import BackgroundRemovalOption, {
+  BACKGROUND_REMOVAL_TIMEOUT,
+  removesBackground,
+  useBackgroundRemovalStatus,
+} from '../../components/BackgroundRemovalOption'
 import { useAuthSelector } from '../../redux/selectors/authSelectors'
 import PrintAreaEditor from '../apparel/PrintAreaEditor'
 import MugPrintFields from './MugPrintFields'
@@ -83,6 +88,8 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
   const [backImage, setBackImage] = useState(null)
   const [overlayImage, setOverlayImage] = useState(null)
   const [removeOverlay, setRemoveOverlay] = useState(false)
+  // Opt-in background removal for new product photos (never for case templates).
+  const [removeBackground, setRemoveBackground] = useState(false)
   const submitting = useRef(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -123,6 +130,9 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
   const phoneModel = phoneCase && !form.readyMadeCase
   const mug = isMug(category ?? record?.category)
   const editing = (action.mode === 'create' || action.mode === 'edit') && company
+  const newPhoto = !!(image || (apparel && backImage))
+  const backgroundRemoval = useBackgroundRemovalStatus(editing && newPhoto && !phoneModel)
+  const removingPreview = removesBackground(removeBackground, backgroundRemoval)
 
   // The phone models of this category, for the "Fits phone model" select.
   const [models, setModels] = useState({ categoryId: null, list: [], loading: false, error: null })
@@ -212,9 +222,11 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
         if (phoneModel && overlayImage && overlayImage.type !== 'image/png')
           throw new Error('The overlay must be a transparent PNG.')
         const fields = companyPayload(form, apparel, phoneCase, mug, record)
-        // Case templates stay untouched so the overlay and areas line up with them. A
-        // ready-made case photo gets the same background handling as other products.
-        if (phoneModel && image) fields.removeBackground = false
+        // Case templates stay untouched so the overlay and areas line up with them. Other
+        // product photos get background removal only when the admin ticks it.
+        const removing = newPhoto && !phoneModel && removingPreview
+        if (removing) fields.removeBackground = true
+        else if (phoneModel && image) fields.removeBackground = false
         if (phoneModel && removeOverlay && !overlayImage && action.mode === 'edit')
           fields.removeOverlay = true
         const files = {
@@ -222,8 +234,11 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
           ...(apparel ? { backImage } : {}),
           ...(phoneModel ? { overlayImage } : {}),
         }
-        const timeout =
-          image || (apparel && backImage) || (phoneModel && overlayImage) ? 120000 : 15000
+        const timeout = removing
+          ? BACKGROUND_REMOVAL_TIMEOUT
+          : image || (apparel && backImage) || (phoneModel && overlayImage)
+            ? 120000
+            : 15000
         request =
           action.mode === 'create'
             ? () =>
@@ -704,7 +719,7 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
                         imageUrl={record?.imageUrl}
                         name={form.name}
                         required={action.mode === 'create'}
-                        processBackground={!phoneModel}
+                        processBackground={!phoneModel && removingPreview}
                         label={
                           apparel
                             ? 'Product image (front)'
@@ -751,9 +766,20 @@ const ProductDialog = ({ action, categories, categoryId, onClose, onSaved }) => 
                           onChange={setBackImage}
                           imageUrl={record?.backImageUrl}
                           name={`${form.name} back`}
-                          processBackground
+                          processBackground={removingPreview}
                           label="Back image (optional)"
                           hint="Used as the studio canvas for designs on the back."
+                        />
+                      </CCol>
+                    )}
+                    {newPhoto && !phoneModel && (
+                      <CCol xs={12}>
+                        <BackgroundRemovalOption
+                          id="product-removeBackground"
+                          checked={removeBackground}
+                          onChange={setRemoveBackground}
+                          status={backgroundRemoval}
+                          hint="Optional and slower (can take a few minutes). Applies to the new product photos above."
                         />
                       </CCol>
                     )}
