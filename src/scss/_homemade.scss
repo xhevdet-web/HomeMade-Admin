@@ -792,6 +792,25 @@ body {
 .hm-image-processing-note > span:first-child { color: var(--hm-gold); }
 .hm-image-upload-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .hm-image-upload-footnote { display: block; margin-top: 10px; font-size: 0.7rem; color: var(--hm-muted); }
+.hm-trim-note { margin-bottom: 0; flex-wrap: wrap; }
+.hm-jewelry-size-preview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 12px 0 0;
+}
+.hm-jewelry-size-slot {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border: 1px dashed var(--hm-muted);
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--hm-paper);
+}
+.hm-jewelry-size-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.hm-jewelry-size-preview figcaption { display: flex; flex-direction: column; font-size: 0.75rem; color: var(--hm-muted); }
+.hm-jewelry-size-preview figcaption strong { font-size: 0.875rem; color: var(--hm-text); }
 @media (max-width: 575px) {
   .hm-image-upload-card { flex-direction: column; align-items: stretch; gap: 16px; padding: 16px; }
   .hm-image-upload-card .hm-product-image-large { align-self: center; }

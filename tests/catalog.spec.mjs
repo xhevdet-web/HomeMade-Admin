@@ -731,3 +731,218 @@ test('broken category image uses the bundled placeholder', async ({ page }) => {
     /catalog-placeholder|^data:image\/svg\+xml/,
   )
 })
+
+/** A PNG drawn in the page: a 175 px grey bead centred on a transparent (or white) canvas. */
+const beadPng = async (
+  page,
+  { width = 1200, height = 1600, opaque = false, type = 'image/png', specks = [] } = {},
+) =>
+  Buffer.from(
+    await page.evaluate(
+      async ({ width, height, opaque, type, specks }) => {
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const context = canvas.getContext('2d')
+        if (opaque) {
+          context.fillStyle = '#ffffff'
+          context.fillRect(0, 0, width, height)
+        }
+        context.fillStyle = '#8a8a8a'
+        context.beginPath()
+        context.arc(width / 2, height / 2, 87.5, 0, Math.PI * 2)
+        context.fill()
+        specks.forEach(([x, y]) => context.fillRect(x, y, 3, 3))
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, type, 0.92))
+        return Array.from(new Uint8Array(await blob.arrayBuffer()))
+      },
+      { width, height, opaque, type, specks },
+    ),
+  )
+
+/** Records the raw bytes of every uploaded file, then lets the catalog mock answer. */
+const captureUploads = async (page) => {
+  const uploads = []
+  await page.route('http://localhost:3000/api/v1/**', async (route) => {
+    const request = route.request()
+    if (['POST', 'PATCH'].includes(request.method()) && request.postDataBuffer()) {
+      const data = await new Response(request.postDataBuffer(), {
+        headers: { 'Content-Type': request.headers()['content-type'] },
+      }).formData()
+      const file = data.get('file')
+      if (file && typeof file !== 'string')
+        uploads.push({
+          name: file.name,
+          type: file.type,
+          bytes: Buffer.from(await file.arrayBuffer()),
+        })
+    }
+    return route.fallback()
+  })
+  return uploads
+}
+
+const pngSize = (bytes) => ({ width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) })
+
+/** Transparent gap on each side of a PNG's visible content, measured in the page. */
+const visibleGaps = (page, bytes) =>
+  page.evaluate(async (array) => {
+    const bitmap = await createImageBitmap(new Blob([new Uint8Array(array)], { type: 'image/png' }))
+    const canvas = document.createElement('canvas')
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+    const context = canvas.getContext('2d')
+    context.drawImage(bitmap, 0, 0)
+    const { data } = context.getImageData(0, 0, bitmap.width, bitmap.height)
+    let left = Infinity
+    let right = -1
+    let top = Infinity
+    let bottom = -1
+    for (let y = 0; y < bitmap.height; y += 1)
+      for (let x = 0; x < bitmap.width; x += 1)
+        if (data[(y * bitmap.width + x) * 4 + 3] > 128) {
+          left = Math.min(left, x)
+          right = Math.max(right, x)
+          top = Math.min(top, y)
+          bottom = Math.max(bottom, y)
+        }
+    return { left, top, right: bitmap.width - 1 - right, bottom: bitmap.height - 1 - bottom }
+  }, Array.from(bytes))
+
+const editPearlPendant = async (page) => {
+  await page.getByRole('button', { name: 'Edit Pearl pendant', exact: true }).click()
+  await dialog(page).getByLabel('Physical size').fill('8')
+}
+const saveSubCategory = async (page) => {
+  await dialog(page).getByRole('button', { name: 'Save SubCategory', exact: true }).click()
+  await expect(dialog(page)).toHaveCount(0)
+}
+
+test('measured jewelry components upload a square trimmed copy; Use original sends the file as picked', async ({
+  page,
+}) => {
+  await setup(page)
+  const uploads = await captureUploads(page)
+  await page.goto(`/#/sub-categories/${categoryId}`)
+  // Dust left after background removal, far from the bead, must not widen the crop.
+  const original = await beadPng(page, {
+    specks: [
+      [20, 20],
+      [1170, 1570],
+      [100, 800],
+    ],
+  })
+
+  await editPearlPendant(page)
+  await dialog(page).getByLabel('Image (optional)').setInputFiles({
+    name: 'bead-photo.webp',
+    mimeType: 'image/webp',
+    buffer: original,
+  })
+  await expect(dialog(page)).toContainText(
+    'Transparent edges were trimmed so the piece fills its 8 mm size.',
+  )
+  await expect(dialog(page).getByLabel('Size preview: 8 mm')).toBeVisible()
+  await saveSubCategory(page)
+
+  const trimmed = uploads.at(-1)
+  expect(trimmed).toMatchObject({ name: 'bead-photo.png', type: 'image/png' })
+  const { width, height } = pngSize(trimmed.bytes)
+  expect(width).toBe(height)
+  expect(width).toBeGreaterThanOrEqual(176)
+  expect(width).toBeLessThanOrEqual(184)
+  // The bead is centred and fills the square up to the small margin.
+  const gaps = await visibleGaps(page, trimmed.bytes)
+  for (const gap of Object.values(gaps)) expect(gap).toBeLessThanOrEqual(4)
+  expect(Math.abs(gaps.left - gaps.right)).toBeLessThanOrEqual(1)
+  expect(Math.abs(gaps.top - gaps.bottom)).toBeLessThanOrEqual(1)
+
+  await editPearlPendant(page)
+  await dialog(page).getByLabel('Image (optional)').setInputFiles({
+    name: 'bead-photo.png',
+    mimeType: 'image/png',
+    buffer: original,
+  })
+  await dialog(page).getByRole('button', { name: 'Use original' }).click()
+  await expect(dialog(page)).toContainText(
+    'The original image will be uploaded with its transparent edges.',
+  )
+  await saveSubCategory(page)
+  expect(uploads.at(-1).name).toBe('bead-photo.png')
+  expect(uploads.at(-1).bytes.equals(original)).toBe(true)
+})
+
+test('opaque images and uploads outside measured jewelry components are sent unchanged', async ({
+  page,
+}) => {
+  const state = await setup(page, {
+    categories: [{ ...baseCategory }, { ...secondCategory, name: 'Hoodies', builderType: 'APPAREL' }],
+    subs: [{ ...baseSub }, { ...baseSub, id: secondId, name: 'Star logo', categoryId: secondId }],
+  })
+  const uploads = await captureUploads(page)
+  await page.goto(`/#/sub-categories/${categoryId}`)
+  const transparent = await beadPng(page)
+
+  // Jewelry, but nothing to trim: a JPEG and a fully opaque PNG.
+  for (const [name, mimeType, buffer] of [
+    ['bead.jpg', 'image/jpeg', await beadPng(page, { opaque: true, type: 'image/jpeg' })],
+    ['bead.png', 'image/png', await beadPng(page, { opaque: true })],
+  ]) {
+    await editPearlPendant(page)
+    await dialog(page).getByLabel('Image (optional)').setInputFiles({ name, mimeType, buffer })
+    await expect(dialog(page).getByLabel('Size preview: 8 mm')).toBeVisible()
+    await expect(dialog(page)).not.toContainText('Transparent edges were trimmed')
+    await saveSubCategory(page)
+    expect(uploads.at(-1)).toMatchObject({ name, type: mimeType })
+    expect(uploads.at(-1).bytes.equals(buffer)).toBe(true)
+  }
+
+  // Not a measured component: an apparel design keeps its exact canvas.
+  await page.goto(`/#/sub-categories/${secondId}`)
+  await page.getByRole('button', { name: 'Edit Star logo', exact: true }).click()
+  await dialog(page).getByLabel('Image (optional)').setInputFiles({
+    name: 'logo.png',
+    mimeType: 'image/png',
+    buffer: transparent,
+  })
+  await expect(dialog(page).getByLabel(/Size preview/)).toHaveCount(0)
+  await saveSubCategory(page)
+  expect(uploads.at(-1).bytes.equals(transparent)).toBe(true)
+
+  // Categories are never trimmed, even jewelry ones.
+  await page.goto('/#/categories')
+  await page.getByRole('button', { name: 'Edit Necklaces', exact: true }).click()
+  await dialog(page).getByLabel('Image (optional)').setInputFiles({
+    name: 'necklaces.png',
+    mimeType: 'image/png',
+    buffer: transparent,
+  })
+  await dialog(page).getByRole('button', { name: 'Save Category', exact: true }).click()
+  await expect(dialog(page)).toHaveCount(0)
+  expect(uploads.at(-1).bytes.equals(transparent)).toBe(true)
+  expect(state.requests.filter((r) => r.method === 'PATCH')).toHaveLength(4)
+})
+
+test('Remove background on a measured jewelry component warns but still saves', async ({
+  page,
+}) => {
+  const state = await setup(page)
+  await page.goto(`/#/sub-categories/${categoryId}`)
+  await editPearlPendant(page)
+  await dialog(page)
+    .getByLabel('Image (optional)')
+    .setInputFiles({
+      name: 'bead.jpg',
+      mimeType: 'image/jpeg',
+      buffer: await beadPng(page, { opaque: true, type: 'image/jpeg' }),
+    })
+  const warning = 'Remove the background before uploading (or upload again after saving)'
+  await expect(dialog(page)).not.toContainText(warning)
+  await dialog(page).getByLabel('Remove background').check()
+  await expect(dialog(page)).toContainText(warning)
+  await saveSubCategory(page)
+  expect(state.requests.find((r) => r.method === 'PATCH').body).toMatchObject({
+    removeBackground: true,
+    effectiveLengthMm: '8',
+  })
+})

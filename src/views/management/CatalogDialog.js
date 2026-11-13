@@ -30,6 +30,7 @@ import BackgroundRemovalOption, {
   useBackgroundRemovalStatus,
 } from '../../components/BackgroundRemovalOption'
 import { imageFormData } from '../../_helpers/imageUpload'
+import trimTransparentImage from '../../_helpers/trimTransparentImage'
 import {
   catalogConfig,
   catalogPayload,
@@ -40,6 +41,7 @@ import {
   typesFor,
 } from './catalogFields'
 import JewelrySizesEditor from './JewelrySizesEditor'
+import JewelrySizePreview from './JewelrySizePreview'
 import StickerSizesEditor from './StickerSizesEditor'
 import { stickerShapes, stickerSizeLabel } from './stickerSizes'
 import { builderLabels } from './catalogFields'
@@ -61,15 +63,46 @@ const CatalogDialog = ({ kind, action, categoryId: fixedCategoryId, onClose, onS
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
   const [error, setError] = useState(null)
-  const [selectedFile, setSelectedFile] = useState(null)
+  // The file the admin picked. Measured jewelry components upload a trimmed copy instead.
+  const [pickedFile, setPickedFile] = useState(null)
+  const [trim, setTrim] = useState(null)
+  const [useOriginal, setUseOriginal] = useState(false)
   // Opt-in: background removal runs only when the admin ticks it for a new upload.
   const [removeBackground, setRemoveBackground] = useState(false)
-  const backgroundRemoval = useBackgroundRemovalStatus(editing && !!selectedFile)
+  const backgroundRemoval = useBackgroundRemovalStatus(editing && !!pickedFile)
   const removing = removesBackground(removeBackground, backgroundRemoval)
   const [customType, setCustomType] = useState(false)
   const submitting = useRef(false)
   const [saving, setSaving] = useState(false)
   const [attempt, setAttempt] = useState(0)
+
+  // Jewelry components are measured: their physical size fills the piece's length.
+  const measuredComponent =
+    isSubCategory &&
+    isJewelryCategory(categories.find((category) => category.id === form.categoryId))
+  // The studio fits the whole image into the piece's size, so transparent space around a
+  // measured component is cropped away. Nothing else is trimmed: products, overlays and
+  // categories rely on their exact canvas.
+  useEffect(() => {
+    if (!measuredComponent || !pickedFile) return undefined
+    let cancelled = false
+    trimTransparentImage(pickedFile)
+      .catch(() => pickedFile)
+      .then((file) => {
+        if (!cancelled) setTrim({ source: pickedFile, file })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [measuredComponent, pickedFile])
+  const trimming = measuredComponent && !!pickedFile && trim?.source !== pickedFile
+  const trimmedFile =
+    measuredComponent && trim?.source === pickedFile && trim.file !== pickedFile ? trim.file : null
+  const selectedFile = trimmedFile && !useOriginal ? trimmedFile : pickedFile
+  const pickFile = (file) => {
+    setPickedFile(file)
+    setUseOriginal(false)
+  }
 
   useEffect(() => {
     const controller = new AbortController()
@@ -157,7 +190,7 @@ const CatalogDialog = ({ kind, action, categoryId: fixedCategoryId, onClose, onS
   }
   const submit = async (event) => {
     event.preventDefault()
-    if (submitting.current) return
+    if (submitting.current || trimming) return
     setError(null)
     if (editing && !form.name.trim()) {
       setError('Name is required.')
@@ -196,7 +229,7 @@ const CatalogDialog = ({ kind, action, categoryId: fixedCategoryId, onClose, onS
       }
       if (saved) {
         setRecord(saved.data)
-        setSelectedFile(null)
+        pickFile(null)
       }
       onSaved(
         `${singular} ${action.mode === 'delete' ? 'deleted' : action.mode === 'create' ? 'created' : 'updated'} successfully.`,
@@ -231,10 +264,6 @@ const CatalogDialog = ({ kind, action, categoryId: fixedCategoryId, onClose, onS
   const componentTypes = typesFor(
     categories.find((category) => category.id === form.categoryId)?.builderType,
   )
-  // Jewelry components are measured: their physical size fills the piece's length.
-  const measuredComponent =
-    isSubCategory &&
-    isJewelryCategory(categories.find((category) => category.id === form.categoryId))
   const changeJewelryShape = (event) => {
     const jewelryShape = event.target.value
     setForm((previous) => ({ ...previous, jewelryShape }))
@@ -582,11 +611,46 @@ const CatalogDialog = ({ kind, action, categoryId: fixedCategoryId, onClose, onS
                       <ImagePicker
                         id="entity-image"
                         file={selectedFile}
-                        onChange={setSelectedFile}
+                        onChange={pickFile}
                         imageUrl={record?.imageUrl}
                         name={form.name}
                         processBackground={removing}
                       />
+                      {trimming && (
+                        <small className="hm-muted d-block mt-2" role="status">
+                          Trimming transparent edges...
+                        </small>
+                      )}
+                      {trimmedFile && (
+                        <div className="hm-image-processing-note hm-trim-note mt-2" role="status">
+                          <span aria-hidden="true">✦</span>
+                          <span>
+                            {useOriginal
+                              ? 'The original image will be uploaded with its transparent edges.'
+                              : `Transparent edges were trimmed so the piece fills its ${
+                                  Number(form.effectiveLengthMm) > 0
+                                    ? `${form.effectiveLengthMm} mm size`
+                                    : 'physical size'
+                                }.`}
+                          </span>
+                          <CButton
+                            type="button"
+                            color="link"
+                            size="sm"
+                            className="p-0 ms-auto"
+                            onClick={() => setUseOriginal((value) => !value)}
+                          >
+                            {useOriginal ? 'Trim edges' : 'Use original'}
+                          </CButton>
+                        </div>
+                      )}
+                      {measuredComponent && (selectedFile || record?.imageUrl) && (
+                        <JewelrySizePreview
+                          file={selectedFile}
+                          imageUrl={record?.imageUrl}
+                          sizeMm={Number(form.effectiveLengthMm) || null}
+                        />
+                      )}
                       {selectedFile && (
                         <BackgroundRemovalOption
                           id="catalog-removeBackground"
@@ -594,6 +658,12 @@ const CatalogDialog = ({ kind, action, categoryId: fixedCategoryId, onClose, onS
                           onChange={setRemoveBackground}
                           status={backgroundRemoval}
                         />
+                      )}
+                      {measuredComponent && selectedFile && removing && (
+                        <CAlert color="warning" className="mt-2 mb-0">
+                          Remove the background before uploading (or upload again after saving)
+                          so the piece can be trimmed to its real size.
+                        </CAlert>
                       )}
                       {isSubCategory && record?.originalImageUrl && (
                         <p className="mt-2 mb-0">
@@ -741,7 +811,11 @@ const CatalogDialog = ({ kind, action, categoryId: fixedCategoryId, onClose, onS
               color={action.mode === 'delete' ? 'danger' : 'primary'}
               type="submit"
               disabled={
-                loading || !!loadError || saving || (editing && isSubCategory && !categories.length)
+                loading ||
+                !!loadError ||
+                saving ||
+                trimming ||
+                (editing && isSubCategory && !categories.length)
               }
             >
               {saving ? (
