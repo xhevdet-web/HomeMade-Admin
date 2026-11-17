@@ -9,6 +9,7 @@ import {
 import {
   brandLabel,
   caseAreaPayload,
+  cameraOverlaps,
   defaultCameraArea,
   defaultCaseArea,
   deviceBrands,
@@ -148,10 +149,11 @@ export const companyPayload = (form, apparel, phoneCase = false, mug = false, or
       fields.printAreas = null
     } else {
       fields.deviceBrand = form.deviceBrand
-      fields.printAreas = {
-        front: caseAreaPayload(form.caseArea),
-        ...(form.cameraEnabled ? { camera: caseAreaPayload(form.cameraArea) } : {}),
-      }
+      const front = caseAreaPayload(form.caseArea, true)
+      const camera = form.cameraEnabled ? caseAreaPayload(form.cameraArea) : null
+      if (camera && !cameraOverlaps(front, camera))
+        throw new Error('Place the camera opening over the printable area, or turn it off.')
+      fields.printAreas = { front, ...(camera ? { camera } : {}) }
     }
   }
   // Unlink a former ready-made case ("" is only valid on PATCH; creates never send it).

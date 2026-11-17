@@ -1,19 +1,25 @@
 import PropTypes from 'prop-types'
 import { MockupCanvas } from '../apparel/PrintAreaEditor'
-import { brandLabel, isCase, radiusStyle } from '../cases/caseHelpers'
+import { brandLabel, isCase, useImageRatio } from '../cases/caseHelpers'
+import { parseCaseTemplate } from '../cases/caseGeometry'
+import { CaseGuides } from '../cases/CaseTemplateLayers'
 
 const fraction = (value) => `${Math.round(Number(value ?? 0.5) * 1000) / 10}%`
 
 /**
  * How a phone case design is printed: the model it was made for (template frozen at order
  * time), its one design or photo, and where the customer placed it inside the printable
- * area. Scale 1 fills the area edge to edge (cover); x/y are the image centre.
+ * area. Scale 1 fills the area edge to edge (cover); x/y are the image centre. The outlines
+ * come from the same geometry as the studio: corners, bleed, safe area and camera.
  */
 const CaseProductionDetails = ({ product }) => {
   const base = product?.baseProduct
   const item = product?.items?.[0]
+  const ratio = useImageRatio(base?.imageUrl) ?? 0.49
   if (!isCase(product?.category) || !base || !item) return null
   const area = base.printAreas?.front
+  const template = area ? parseCaseTemplate(base.printAreas, area) : null
+  const pct = (value) => `${Math.round(value * 1000) / 10}%`
   const ownPhoto = !!item.customImageUrl
   const rows = [
     ['Phone model', [brandLabel(base.deviceBrand), base.name].filter(Boolean).join(' ')],
@@ -21,6 +27,19 @@ const CaseProductionDetails = ({ product }) => {
     ['Centre (x, y)', `${fraction(item.x)}, ${fraction(item.y)} of the printable area`],
     ['Scale', `${Math.round((item.scale ?? 1) * 100)}% of edge-to-edge fill`],
     ['Rotation', `${Math.round((item.rotation ?? 0) * 10) / 10}°`],
+    ...(template?.bleed
+      ? [['Bleed', `${pct(template.bleed)} of the printable width past every edge`]]
+      : []),
+    ...(template?.safe
+      ? [
+          [
+            'Safe area inset',
+            ['top', 'right', 'bottom', 'left']
+              .map((side) => `${side} ${pct(template.safe[side])}`)
+              .join(', '),
+          ],
+        ]
+      : []),
   ]
   return (
     <section className="hm-order-section" aria-labelledby="case-production-title">
@@ -35,19 +54,8 @@ const CaseProductionDetails = ({ product }) => {
               overlaySrc={base.overlayImageUrl}
               side="printable"
               area={area}
-              areaStyle={radiusStyle(area)}
-              guides={
-                base.printAreas?.camera
-                  ? [
-                      {
-                        key: 'camera',
-                        area: base.printAreas.camera,
-                        label: 'Camera',
-                        style: radiusStyle(base.printAreas.camera),
-                      },
-                    ]
-                  : []
-              }
+              areaClassName="is-ghost"
+              overlay={template && <CaseGuides template={template} ratio={ratio} />}
             />
           </div>
         )}
@@ -64,6 +72,9 @@ const CaseProductionDetails = ({ product }) => {
         The customer design preview above shows the finished look. Print from the original file
         {ownPhoto ? ' the customer uploaded' : ' of the design'}; artwork is clipped to the
         printable area and never covers the camera opening.
+        {template?.bleed
+          ? ' Let it run into the bleed (outer line) so no edge is left unprinted.'
+          : ''}
       </p>
     </section>
   )

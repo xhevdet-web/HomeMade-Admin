@@ -1,5 +1,6 @@
 // HomeMade extends the existing CoreUI layout and Sass entrypoint.
 :root {
+  --hm-case-safe: #1f8a5b;
   --hm-navy: #20384b;
   --hm-steel: #55778e;
   --hm-gold: #b69a63;
@@ -15,6 +16,7 @@
   --hm-line: #344955;
   --hm-text: #eff2f2;
   --hm-muted: #aab8c1;
+  --hm-case-safe: #4cc38a;
 }
 body {
   background: var(--hm-paper);
@@ -1481,6 +1483,118 @@ body {
 }
 .hm-case-mockup .hm-mockup {
   max-width: 260px;
+}
+// Case template layers (caseGeometry.js): SVG outlines and the admin-only test artwork.
+.hm-case-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.hm-case-guides path {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+.hm-case-guide-printable {
+  stroke: var(--hm-gold);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+.hm-case-guide-bleed {
+  stroke: var(--hm-gold);
+  stroke-width: 1;
+  stroke-opacity: 0.6;
+  stroke-dasharray: 2 3;
+}
+.hm-case-guide-safe {
+  stroke: var(--hm-case-safe);
+  stroke-width: 1.5;
+  stroke-dasharray: 1 4;
+  stroke-linecap: round;
+}
+.hm-case-guide-camera {
+  stroke: var(--hm-steel);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  fill: rgba(60, 72, 88, 0.18) !important;
+}
+.hm-case-guides .is-active {
+  stroke-width: 3;
+  stroke-opacity: 1;
+}
+.hm-case-test-number {
+  fill: #fff;
+  stroke: rgba(0, 0, 0, 0.45);
+  stroke-width: 0.4;
+  font-weight: 700;
+  font-family: system-ui, sans-serif;
+}
+.hm-case-test-label {
+  fill: #fff;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-family: system-ui, sans-serif;
+}
+.hm-case-test-diagonal {
+  stroke: rgba(255, 255, 255, 0.7);
+  stroke-width: 0.5;
+}
+// The draggable rectangle stays a hit area with handles; the SVG draws the real shape.
+.hm-print-area.is-ghost {
+  border-color: transparent;
+  background: transparent;
+}
+.hm-print-area.is-ghost.is-editable:hover {
+  outline: 1px dashed var(--hm-gold);
+}
+.hm-case-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+.hm-case-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--hm-muted);
+}
+.hm-case-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hm-case-swatch {
+  width: 18px;
+  height: 0;
+  border-top: 2px dashed var(--hm-gold);
+}
+.hm-case-swatch.is-bleed {
+  border-top: 1px dotted var(--hm-gold);
+  opacity: 0.8;
+}
+.hm-case-swatch.is-safe {
+  border-top: 2px dotted var(--hm-case-safe);
+}
+.hm-case-swatch.is-camera {
+  border-top-color: var(--hm-steel);
+}
+.hm-case-fieldset {
+  margin-bottom: 14px;
+}
+.hm-case-fieldset legend {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--hm-muted);
+  margin-bottom: 4px;
 }
 .hm-print-area.is-editable:focus-visible {
   outline: 3px solid var(--hm-steel);

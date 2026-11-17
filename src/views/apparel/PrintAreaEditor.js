@@ -10,7 +10,9 @@ const percent = (value) => Math.round(Number(value) * 1000) / 10
 /**
  * Mockup with a draggable, resizable print rectangle stored as fractions of the image.
  * Phone case templates also stack their overlay (`overlaySrc`), round the area's corners
- * (`areaStyle`) and show other areas, such as the camera, as passive `guides`.
+ * (`areaStyle`) and show other areas, such as the camera, as passive `guides`. They may add
+ * an `underlay` (drawn under the overlay image, e.g. test artwork), an `overlay` (above it,
+ * e.g. SVG guides) and an `areaClassName` for the draggable rectangle.
  */
 export const MockupCanvas = ({
   src,
@@ -22,6 +24,9 @@ export const MockupCanvas = ({
   overlaySrc,
   areaStyle,
   guides = [],
+  underlay = null,
+  overlay = null,
+  areaClassName = '',
 }) => {
   const frame = useRef(null)
   const drag = useRef(null)
@@ -87,6 +92,7 @@ export const MockupCanvas = ({
       ) : (
         <GarmentSilhouette silhouette={silhouette} side={side} />
       )}
+      {underlay}
       {overlaySrc && (
         <img
           className="hm-mockup-overlay"
@@ -112,9 +118,10 @@ export const MockupCanvas = ({
           {guide.label && <span>{guide.label}</span>}
         </div>
       ))}
+      {overlay}
       {area && (
         <div
-          className={`hm-print-area${onChange ? ' is-editable' : ''}`}
+          className={`hm-print-area${onChange ? ' is-editable' : ''}${areaClassName ? ` ${areaClassName}` : ''}`}
           style={{
             left: `${area.x * 100}%`,
             top: `${area.y * 100}%`,
@@ -165,6 +172,9 @@ MockupCanvas.propTypes = {
       style: PropTypes.object,
     }),
   ),
+  underlay: PropTypes.node,
+  overlay: PropTypes.node,
+  areaClassName: PropTypes.string,
 }
 
 const PrintAreaEditor = ({ side, label, src, silhouette, enabled, area, onEnabled, onChange }) => {
