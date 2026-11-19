@@ -45,6 +45,9 @@ export const emptyPackagingForm = {
   shape: 'SQUARE',
   price: '',
   stock: 0,
+  capacity: '',
+  allowedTypes: [],
+  suggestedBundles: [],
   isActive: true,
   sortOrder: 0,
 }
@@ -58,13 +61,61 @@ export const packagingForm = (record) =>
         shape: record.shape || 'SQUARE',
         price: centsToEuros(record.price),
         stock: record.stock,
+        capacity: record.capacity ?? '',
+        allowedTypes: record.allowedTypes || [],
+        suggestedBundles: (Array.isArray(record.suggestedBundles) ? record.suggestedBundles : []).map(
+          (bundle) => ({
+            name: bundle.name || '',
+            items: (bundle.items || []).map((item) => ({
+              subCategoryId: item.subCategoryId,
+              quantity: String(item.quantity),
+            })),
+          }),
+        ),
         isActive: record.isActive,
         sortOrder: record.sortOrder,
       }
     : emptyPackagingForm
 
+/** Items in a bundle, counted like the Gift Studio slots. */
+export const bundleCount = (bundle) =>
+  bundle.items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
+
+/**
+ * Capacity, allowed types and bundles as the API takes them. Bundle rows for items that no
+ * longer exist (`known` is the set of current gift item ids) are dropped on save.
+ */
+const contentsPayload = (form, known) => {
+  const capacity = String(form.capacity ?? '').trim()
+  if (capacity && (!/^\d+$/.test(capacity) || Number(capacity) < 1 || Number(capacity) > 100))
+    throw new Error('Capacity must be a whole number from 1 to 100, or empty for no limit.')
+  const bundles = form.suggestedBundles.map((bundle, index) => {
+    const name = bundle.name.trim()
+    const label = name ? `"${name}"` : `Bundle ${index + 1}`
+    if (!name) throw new Error(`${label} needs a name.`)
+    const items = bundle.items
+      .filter((item) => !known || !item.subCategoryId || known.has(item.subCategoryId))
+      .map((item) => {
+        if (!item.subCategoryId) throw new Error(`Choose an item for every row of ${label}.`)
+        const quantity = Number(item.quantity)
+        if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100)
+          throw new Error(`Quantities in ${label} must be whole numbers from 1 to 100.`)
+        return { subCategoryId: item.subCategoryId, quantity }
+      })
+    if (!items.length) throw new Error(`Add at least one item to ${label}.`)
+    if (capacity && bundleCount({ items }) > Number(capacity))
+      throw new Error(`${label} has more items than the box holds (${capacity}).`)
+    return { name, items }
+  })
+  return {
+    capacity: capacity ? Number(capacity) : null,
+    allowedTypes: form.allowedTypes,
+    suggestedBundles: bundles.length ? bundles : null,
+  }
+}
+
 /** Validated packaging fields; throws a readable Error. Prices are typed in euros. */
-export const packagingPayload = (form, colored) => {
+export const packagingPayload = (form, colored, known) => {
   if (!form.name.trim()) throw new Error('Name is required.')
   if (!packagingTypes[form.type]) throw new Error('Choose a packaging type.')
   return {
@@ -76,6 +127,7 @@ export const packagingPayload = (form, colored) => {
     price: eurosToCents(form.price),
     // Coloured packaging keeps its stock per colour.
     ...(colored ? {} : { stock: wholeNumber(form.stock, 'Stock') }),
+    ...contentsPayload(form, known),
     isActive: form.isActive,
     sortOrder: wholeNumber(form.sortOrder, 'Sort order'),
   }

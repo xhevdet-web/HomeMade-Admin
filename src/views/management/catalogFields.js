@@ -59,7 +59,8 @@ const componentTypes = {
     DECORATION: 'Decoration',
     WRAPPING: 'Wrapping',
   },
-  GIFT: { BAG: 'Bag & box', FILLER: 'Filler', ITEM: 'Item', DECORATION: 'Decoration' },
+  // Gift items only: bags and boxes are Gift Packaging. The Gift Studio filters by these.
+  GIFT: { ITEM: 'Item', DECORATION: 'Decoration', FILLER: 'Filler' },
   // Case artwork is digital: printed full-bleed, never stocked or measured.
   CASE: { ILLUSTRATION: 'Illustration', PATTERN: 'Pattern', PHOTO: 'Photo', LOGO: 'Logo' },
   // Sticker designs are printed on demand like case artwork; the app filters by these.

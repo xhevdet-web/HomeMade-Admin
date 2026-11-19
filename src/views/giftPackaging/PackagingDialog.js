@@ -22,7 +22,14 @@ import { apiErrorMessage } from '../../_helpers/api'
 import ImagePicker from '../../components/ImagePicker'
 import { formatPrice } from '../products/productHelpers'
 import PackagingColorEditor from './PackagingColorEditor'
-import { createPackaging, deletePackaging, getPackaging, updatePackaging } from './giftPackagingApi'
+import PackagingContents from './PackagingContents'
+import {
+  createPackaging,
+  deletePackaging,
+  getPackaging,
+  listGiftItems,
+  updatePackaging,
+} from './giftPackagingApi'
 import {
   availableStock,
   hasColors,
@@ -47,7 +54,25 @@ const PackagingDialog = ({ action: initialAction, onClose, onSaved, onChanged })
   const [notice, setNotice] = useState(null)
   const [saving, setSaving] = useState(false)
   const [attempt, setAttempt] = useState(0)
+  // Gift items, for allowed types and bundles; null until loaded.
+  const [giftItems, setGiftItems] = useState(null)
+  const [giftItemsError, setGiftItemsError] = useState(null)
   const submitting = useRef(false)
+
+  useEffect(() => {
+    if (initialAction.mode === 'delete') return
+    const controller = new AbortController()
+    listGiftItems(controller.signal)
+      .then((items) => {
+        if (!controller.signal.aborted) setGiftItems(items)
+      })
+      .catch((failure) => {
+        if (controller.signal.aborted) return
+        setGiftItems([])
+        setGiftItemsError(apiErrorMessage(failure, 'Gift items could not be loaded.'))
+      })
+    return () => controller.abort()
+  }, [initialAction])
 
   useEffect(() => {
     if (initialAction.mode === 'create') return
@@ -103,7 +128,10 @@ const PackagingDialog = ({ action: initialAction, onClose, onSaved, onChanged })
       }
       let fields
       try {
-        fields = packagingPayload(form, colored && opaque)
+        // Unknown items are only dropped when the item list really loaded.
+        const known =
+          giftItems && !giftItemsError ? new Set(giftItems.map((item) => item.id)) : undefined
+        fields = packagingPayload(form, colored && opaque, known)
       } catch (validationError) {
         setError(validationError.message)
         return
@@ -340,6 +368,20 @@ const PackagingDialog = ({ action: initialAction, onClose, onSaved, onChanged })
                   </CCol>
                 </CRow>
               </fieldset>
+              {giftItems === null ? (
+                <p className="hm-muted small mt-4 mb-0" role="status">
+                  <CSpinner size="sm" aria-hidden="true" className="me-2" />
+                  Loading gift items...
+                </p>
+              ) : (
+                <PackagingContents
+                  form={form}
+                  setForm={setForm}
+                  items={giftItems}
+                  itemsError={giftItemsError}
+                  disabled={saving}
+                />
+              )}
               {opaque &&
                 (record ? (
                   <PackagingColorEditor

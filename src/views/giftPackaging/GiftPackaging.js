@@ -158,7 +158,15 @@ const GiftPackaging = () => {
                         <div className="hm-muted small">{record.description}</div>
                       )}
                     </CTableDataCell>
-                    <CTableDataCell>{kindLabel(record)}</CTableDataCell>
+                    <CTableDataCell>
+                      {kindLabel(record)}
+                      <div className="hm-muted small">
+                        {record.capacity ? `Holds ${record.capacity} items` : 'No item limit'}
+                        {record.suggestedBundles?.length
+                          ? ` · ${record.suggestedBundles.length} bundle${record.suggestedBundles.length === 1 ? '' : 's'}`
+                          : ''}
+                      </div>
+                    </CTableDataCell>
                     <CTableDataCell>{formatPrice(record.price)}</CTableDataCell>
                     <CTableDataCell>
                       {availableStock(record)}

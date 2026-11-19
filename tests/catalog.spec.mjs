@@ -367,7 +367,7 @@ test('component types follow the studio of the chosen category', async ({ page }
   ])
   await dialog(page).getByLabel('Category', { exact: true }).selectOption(secondId)
   await expect(type.locator('option')).toHaveText([
-    'Not specified', 'Bag & box', 'Filler', 'Item', 'Decoration', 'Other (free text, e.g. beads)',
+    'Not specified', 'Item', 'Decoration', 'Filler', 'Other (free text, e.g. beads)',
   ])
   // WRAPPING is not a gift type, so it is kept as free text instead of being lost.
   await expect(dialog(page).getByLabel('Custom type')).toHaveValue('WRAPPING')

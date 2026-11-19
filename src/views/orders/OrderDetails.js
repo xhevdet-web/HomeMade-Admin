@@ -354,6 +354,22 @@ const OrderDetails = ({ id, initialDelete = false, onClose, onChanged, onDeleted
               <UploadedArtwork product={product} />
               <ProductionSheet product={product} orderNumber={order.orderNumber} />
               <CaseProductionDetails product={product} />
+              {(product?.giftRecipient || product?.giftMessage) && (
+                <section className="hm-order-section" aria-labelledby="gift-card-title">
+                  <h3 id="gift-card-title">Gift card</h3>
+                  <p className="hm-muted small mb-2">Write this by hand on the card in the box.</p>
+                  {product.giftRecipient && (
+                    <p className="mb-1">
+                      <strong>To:</strong> {product.giftRecipient}
+                    </p>
+                  )}
+                  {product.giftMessage && (
+                    <p className="hm-order-text" style={{ whiteSpace: 'pre-line' }}>
+                      {product.giftMessage}
+                    </p>
+                  )}
+                </section>
+              )}
               <section className="hm-order-section">
                 <h3>Customer notes</h3>
                 <p className="hm-order-text">{order.customerNotes || 'No customer notes.'}</p>
